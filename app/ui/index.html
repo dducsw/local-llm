@@ -589,7 +589,45 @@
             <!-- ========================================================================= -->
             <!-- VIEW 1: INFERENCE TELEMETRY, MODELS & HARDWARE OVERVIEW                  -->
             <!-- ========================================================================= -->
-            <div id="view-telemetry" class="space-y-6">
+            <div id="view-telemetry" class="space-y-4">
+
+                <!-- COMPACT TOP BAR WITH RIGHT-ALIGNED MODEL FILTER -->
+                <div class="flex items-center justify-between gap-3 text-xs">
+                    <div class="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                        <span class="w-2 h-2 rounded-full bg-neon-500 animate-neon-pulse"></span>
+                        <span>Telemetry & Cluster Overview</span>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0">
+                        <!-- Custom Model Dropdown Selector -->
+                        <div class="relative shrink-0" id="global-model-dropdown-wrapper">
+                            <button id="btn-model-selector-toggle" onclick="toggleModelDropdown(event)"
+                                class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#0a0f18] hover:bg-slate-50 dark:hover:bg-[#111827] border border-slate-200/90 dark:border-slate-800 rounded-xl text-xs font-semibold shadow-sm transition-all group">
+                                <i data-lucide="box" class="w-3.5 h-3.5 text-neon-700 dark:text-neon-400 group-hover:scale-110 transition-transform shrink-0"></i>
+                                <span class="text-[11px] font-bold text-slate-400 uppercase shrink-0">MODEL:</span>
+                                <span id="global-model-selected-label" class="font-mono font-bold text-slate-900 dark:text-white">--</span>
+                                <i data-lucide="chevron-down" id="model-dropdown-chevron" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0"></i>
+                            </button>
+
+                            <!-- Custom Dropdown Popover List -->
+                            <div id="global-model-dropdown-menu"
+                                class="hidden absolute right-0 mt-2 min-w-[260px] bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl dark:shadow-glow-neon p-2 space-y-1 z-50 transition-all backdrop-blur-md">
+                                <div class="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                                    <span>Available Models</span>
+                                    <span id="model-dropdown-count" class="text-neon-700 dark:text-neon-400 font-mono font-bold">1</span>
+                                </div>
+                                <div id="global-model-items-list" class="space-y-1 max-h-56 overflow-y-auto pr-1">
+                                    <!-- Populated dynamically via JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onclick="refreshDashboardTelemetry()" title="Refresh Telemetry Metrics"
+                            class="p-2 bg-white hover:bg-slate-50 dark:bg-[#0a0f18] dark:hover:bg-slate-800/80 border border-slate-200/90 dark:border-slate-800 rounded-xl text-slate-600 dark:text-slate-300 hover:text-neon-500 text-xs transition-all shadow-sm flex items-center justify-center">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
 
                 <!-- TOP HARDWARE & INFRA KPI CARDS (4 Columns) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -598,37 +636,37 @@
                     <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3 transition-all">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Serving Model</span>
-                            <div class="w-8 h-8 rounded-xl bg-neon-50 dark:bg-neon-500/10 text-neon-700 dark:text-neon-400 flex items-center justify-center dark:shadow-glow-neon-sm">
-                                <i data-lucide="box" class="w-4 h-4"></i>
-                            </div>
+                            <span id="metric-model-status-badge" class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-bold font-mono">
+                                --
+                            </span>
                         </div>
                         <div>
                             <span id="metric-model-name" class="text-xl font-extrabold text-slate-900 dark:text-white truncate block font-mono">
-                                qwen3.5-9b
+                                --
                             </span>
-                            <span class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block">Q4_K_M GGUF (FP16 Attention)</span>
+                            <span id="metric-model-upstream" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block truncate">Loading model metadata...</span>
                         </div>
                         <div class="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                            <span class="text-slate-400">Context Window</span>
-                            <span class="font-bold text-neon-700 dark:text-neon-400 font-mono">32,768 tokens</span>
+                            <span class="text-slate-400">Owner / Cluster</span>
+                            <span id="metric-model-provider" class="font-bold text-neon-700 dark:text-neon-400 font-mono">--</span>
                         </div>
                     </div>
 
-                    <!-- Card 2: GPU VRAM Allocation -->
+                    <!-- Card 2: GPU VRAM & Node Allocation -->
                     <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3 transition-all">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">VRAM & Cache</span>
+                            <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">VRAM & Nodes</span>
                             <div class="w-8 h-8 rounded-xl bg-neon-50 dark:bg-neon-500/10 text-neon-700 dark:text-neon-400 flex items-center justify-center dark:shadow-glow-neon-sm">
                                 <i data-lucide="hard-drive" class="w-4 h-4"></i>
                             </div>
                         </div>
                         <div class="flex items-baseline gap-1.5">
-                            <span id="metric-vram-usage" class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">~5.8</span>
-                            <span class="text-xs font-semibold text-slate-400">/ 16.0 GB (Tesla V100)</span>
+                            <span id="metric-vram-usage" class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">--</span>
+                            <span id="metric-vram-sub" class="text-xs font-semibold text-slate-400">nodes in cluster</span>
                         </div>
                         <div class="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                            <span class="text-slate-400">KV Cache Free</span>
-                            <span class="font-bold text-neon-700 dark:text-neon-400 font-mono">~64% Headroom</span>
+                            <span class="text-slate-400">Compute State</span>
+                            <span id="metric-node-status" class="font-bold text-neon-700 dark:text-neon-400 font-mono">--</span>
                         </div>
                     </div>
 
@@ -767,7 +805,7 @@
                                     <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1.5">Target Model</label>
                                     <select id="play-model-select"
                                         class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
-                                        <option value="qwen3.5-9b">qwen3.5-9b (Q4_K_M GGUF)</option>
+                                        <option value="">Loading models...</option>
                                     </select>
                                 </div>
                                 <div>
@@ -954,32 +992,32 @@
                     <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
                         <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Compute Nodes</span>
                         <div class="flex items-baseline gap-1.5">
-                            <span id="slurm-node-count" class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">4</span>
+                            <span id="slurm-node-count" class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">--</span>
                             <span class="text-xs text-slate-400">Total Nodes</span>
                         </div>
                         <div class="flex gap-2 text-xs font-mono font-bold">
-                            <span class="text-neon-700 dark:text-neon-400" id="slurm-nodes-idle">2 IDLE</span>
-                            <span class="text-amber-600 dark:text-amber-400" id="slurm-nodes-mixed">1 MIXED</span>
-                            <span class="text-rose-600 dark:text-rose-400" id="slurm-nodes-drain">1 DRAIN</span>
+                            <span class="text-neon-700 dark:text-neon-400" id="slurm-nodes-idle">-- IDLE</span>
+                            <span class="text-amber-600 dark:text-amber-400" id="slurm-nodes-mixed">-- MIXED</span>
+                            <span class="text-rose-600 dark:text-rose-400" id="slurm-nodes-drain">-- DRAIN</span>
                         </div>
                     </div>
 
                     <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
                         <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Active Slurm Jobs</span>
                         <div class="flex items-baseline gap-1.5">
-                            <span id="slurm-active-count" class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">1</span>
+                            <span id="slurm-active-count" class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">0</span>
                             <span class="text-xs text-slate-400">Running</span>
                         </div>
-                        <span class="text-xs text-neon-700 dark:text-neon-400 font-mono font-bold block" id="slurm-active-node-badge">Node: gpunode1</span>
+                        <span class="text-xs text-neon-700 dark:text-neon-400 font-mono font-bold block" id="slurm-active-node-badge">Node: --</span>
                     </div>
 
                     <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
                         <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">GPU Accelerators</span>
                         <div class="flex items-baseline gap-1.5">
-                            <span class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">16</span>
-                            <span class="text-xs text-slate-400">x Tesla V100 (4/node)</span>
+                            <span id="slurm-gpu-count" class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">--</span>
+                            <span class="text-xs text-slate-400">GPUs active</span>
                         </div>
-                        <span class="text-xs text-slate-400 font-mono block">Driver 535.183 • CUDA 12.2</span>
+                        <span id="slurm-driver-info" class="text-xs text-slate-400 font-mono block">Cluster GRES Capacity</span>
                     </div>
                 </div>
 
@@ -1080,21 +1118,7 @@
 
                     <div id="slurm-log-terminal"
                         class="w-full h-80 overflow-y-auto bg-slate-950 dark:bg-[#06080d] text-neon-400 p-4 text-xs font-mono whitespace-pre-wrap rounded-xl border border-slate-800 selection:bg-neon-500 selection:text-slate-950">
-============================================================
-Job ID: 491823
-Node: gpunode1.gitc.hpc
-Image: /home/u001013/local-llm/infra/build/vllm.sif
-Model: Qwen3.5-9B-Q4_K_M.gguf
-Port: 8000
-TP: 1
-============================================================
-Tesla V100-SXM2-16GB, 535.183.01, 16384 MiB
-INFO [api_server.py] Initializing vLLM (Legacy V0 Engine for SM70 Volta)
-INFO [config.py] Prefix caching enabled: True, Chunked prefill: True
-INFO [model_runner.py] Loading GGUF weights: /cache/models/Qwen3.5-9B-Q4_K_M.gguf
-INFO [model_runner.py] Memory profiling: Model weights 5824 MiB, KV Cache 9216 MiB
-INFO [api_server.py] Route: POST /v1/chat/completions ready
-INFO [api_server.py] Server started on http://0.0.0.0:8000
+[HPC Slurm Monitor] Ready. Click "Tail Logs" or select an active job to inspect real-time job output.
                     </div>
                 </div>
 
@@ -1115,16 +1139,25 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                                     <i data-lucide="sliders" class="w-4 h-4 text-neon-700 dark:text-neon-400"></i>
                                     Model Parameters
                                 </span>
-                                <span class="px-2 py-0.5 rounded-full bg-neon-50 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30 text-[10px] font-mono font-bold text-neon-700 dark:text-neon-400">
-                                    qwen3.5-9b
+                                <span id="chat-selected-model-pill" class="px-2 py-0.5 rounded-full bg-neon-50 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30 text-[10px] font-mono font-bold text-neon-700 dark:text-neon-400">
+                                    --
                                 </span>
+                            </div>
+
+                            <!-- Target Model Selector in Chat Studio -->
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Target Model</label>
+                                <select id="chat-model-select" onchange="onGlobalModelFilterChange(this.value)"
+                                    class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
+                                </select>
                             </div>
 
                             <!-- System Instructions -->
                             <div>
                                 <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">System Prompt</label>
                                 <textarea id="chat-system-prompt" rows="3"
-                                    class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">You are a helpful, concise, technically accurate AI assistant powered by Qwen 3.5 running on an HPC Tesla V100 GPU.</textarea>
+                                    placeholder="Enter custom system instructions..."
+                                    class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">You are a helpful, concise, and technically accurate AI assistant running locally on your HPC cluster via AI Local Gateway.</textarea>
                             </div>
 
                             <!-- Sliders -->
@@ -1171,12 +1204,12 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                         <!-- Chat Header -->
                         <div class="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-[#111827]/60 flex items-center justify-between">
                             <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-neon-600 to-emerald-400 text-slate-950 font-black flex items-center justify-center text-xs shadow-sm dark:shadow-glow-neon-sm">
-                                    Q
+                                <div id="chat-model-avatar" class="w-8 h-8 rounded-xl bg-gradient-to-tr from-neon-600 to-emerald-400 text-slate-950 font-black flex items-center justify-center text-xs shadow-sm dark:shadow-glow-neon-sm uppercase font-mono">
+                                    AI
                                 </div>
                                 <div>
-                                    <span class="font-bold text-xs text-slate-900 dark:text-white block">Qwen 3.5 9B GGUF</span>
-                                    <span class="text-[10px] text-neon-700 dark:text-neon-400 font-bold flex items-center gap-1">
+                                    <span id="chat-header-model-name" class="font-bold text-xs text-slate-900 dark:text-white block font-mono">--</span>
+                                    <span id="chat-header-status" class="text-[10px] text-neon-700 dark:text-neon-400 font-bold flex items-center gap-1">
                                         <span class="w-1.5 h-1.5 bg-neon-500 rounded-full animate-neon-pulse"></span>
                                         Ready for Inference
                                     </span>
@@ -1191,11 +1224,11 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                         <!-- Chat Messages Container -->
                         <div id="chat-messages-container" class="flex-1 p-6 overflow-y-auto space-y-4 max-h-[500px]">
                             <div class="flex items-start gap-3">
-                                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-neon-600 to-emerald-400 text-slate-950 font-black flex items-center justify-center text-xs flex-shrink-0 shadow-sm dark:shadow-glow-neon-sm">
-                                    Q
+                                <div id="chat-welcome-avatar" class="w-8 h-8 rounded-xl bg-gradient-to-tr from-neon-600 to-emerald-400 text-slate-950 font-black flex items-center justify-center text-xs flex-shrink-0 shadow-sm dark:shadow-glow-neon-sm font-mono">
+                                    AI
                                 </div>
-                                <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-2xl w-full markdown-body">
-                                    <p>Hello! I am <strong>Qwen 3.5 9B GGUF</strong>, running locally on your HPC cluster via <strong>V100-local Gateway</strong>. How can I assist your AI engineering workload today?</p>
+                                <div id="chat-welcome-bubble" class="p-4 rounded-2xl bg-slate-100/80 dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-2xl w-full markdown-body">
+                                    <p>Hello! I am connected to the local AI Gateway. Select a model or enter your prompt below.</p>
                                 </div>
                             </div>
                         </div>
@@ -1221,7 +1254,7 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                             </div>
                             <div class="flex justify-between items-center text-[10px] text-slate-400">
                                 <span>Markdown & Code Highlighting Enabled</span>
-                                <span class="font-mono">model: qwen3.5-9b</span>
+                                <span class="font-mono" id="chat-footer-model-label">model: --</span>
                             </div>
                         </div>
 
@@ -1292,7 +1325,7 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                             <div class="space-y-3.5 text-xs">
                                 <div>
                                     <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1.5">Client / Application Name</label>
-                                    <input type="text" id="page-key-name" value="qwen-python-client"
+                                    <input type="text" id="page-key-name" value="llm-api-client"
                                         placeholder="e.g. data-science-team"
                                         class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
                                 </div>
@@ -1308,7 +1341,6 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                                         <select id="page-key-model"
                                             class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
                                             <option value="*">All Models (*)</option>
-                                            <option value="qwen3.5-9b" selected>qwen3.5-9b</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1409,7 +1441,7 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                     <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Model Weights & Format</label>
                     <select id="submit-job-model"
                         class="w-full p-2.5 bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
-                        <option value="Qwen3.5-9B-Q4_K_M.gguf" selected>Qwen 3.5 9B (Q4_K_M GGUF - FP16)</option>
+                        <option value="">Loading models...</option>
                     </select>
                 </div>
 
@@ -1511,12 +1543,22 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
             }
         }
 
-        // Close dropdown when clicking outside
+        // Close dropdowns when clicking outside
         document.addEventListener('click', function (e) {
-            const wrapper = document.getElementById('header-settings-dropdown-wrapper');
-            const menu = document.getElementById('settings-dropdown-menu');
-            if (menu && !menu.classList.contains('hidden') && wrapper && !wrapper.contains(e.target)) {
-                menu.classList.add('hidden');
+            // Settings dropdown
+            const settingsWrapper = document.getElementById('header-settings-dropdown-wrapper');
+            const settingsMenu = document.getElementById('settings-dropdown-menu');
+            if (settingsMenu && !settingsMenu.classList.contains('hidden') && settingsWrapper && !settingsWrapper.contains(e.target)) {
+                settingsMenu.classList.add('hidden');
+            }
+
+            // Model dropdown
+            const modelWrapper = document.getElementById('global-model-dropdown-wrapper');
+            const modelMenu = document.getElementById('global-model-dropdown-menu');
+            const chevron = document.getElementById('model-dropdown-chevron');
+            if (modelMenu && !modelMenu.classList.contains('hidden') && modelWrapper && !modelWrapper.contains(e.target)) {
+                modelMenu.classList.add('hidden');
+                if (chevron) chevron.classList.remove('rotate-180');
             }
         });
 
@@ -2033,7 +2075,7 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                 return;
             }
 
-            const name = document.getElementById('page-key-name').value.trim() || 'qwen-client';
+            const name = document.getElementById('page-key-name').value.trim() || 'api-client';
             const rpm = parseInt(document.getElementById('page-key-rpm').value, 10) || 60;
             const modelVal = document.getElementById('page-key-model').value;
             const allowed_models = modelVal === '*' ? ['*'] : [modelVal];
@@ -2124,27 +2166,234 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
             }
         }
 
+        let currentSelectedModel = '';
+        let availableModelsList = [];
+
+        function toggleModelDropdown(event) {
+            if (event) event.stopPropagation();
+            const menu = document.getElementById('global-model-dropdown-menu');
+            const chevron = document.getElementById('model-dropdown-chevron');
+            if (menu) {
+                const isHidden = menu.classList.toggle('hidden');
+                if (chevron) {
+                    if (!isHidden) chevron.classList.add('rotate-180');
+                    else chevron.classList.remove('rotate-180');
+                }
+                if (!isHidden && window.lucide) lucide.createIcons();
+            }
+        }
+
+        function selectGlobalModel(modelId) {
+            currentSelectedModel = modelId;
+            const label = document.getElementById('global-model-selected-label');
+            if (label) label.innerText = modelId;
+
+            const menu = document.getElementById('global-model-dropdown-menu');
+            const chevron = document.getElementById('model-dropdown-chevron');
+            if (menu) menu.classList.add('hidden');
+            if (chevron) chevron.classList.remove('rotate-180');
+
+            renderModelDropdownList();
+            onGlobalModelFilterChange(modelId);
+        }
+
+        function renderModelDropdownList() {
+            const container = document.getElementById('global-model-items-list');
+            const countEl = document.getElementById('model-dropdown-count');
+            if (!container) return;
+
+            if (countEl) countEl.innerText = availableModelsList.length;
+
+            if (availableModelsList.length === 0) {
+                container.innerHTML = `
+                    <div class="p-3 text-center text-xs text-slate-400">
+                        No models reachable via API
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = availableModelsList.map(m => {
+                const isSelected = m.id === currentSelectedModel;
+                const isOnline = (m.status === 'online');
+                const statusDot = isOnline 
+                    ? '<span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>' 
+                    : '<span class="w-2 h-2 rounded-full bg-rose-500"></span>';
+                const statusBadge = isOnline
+                    ? '<span class="text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-1.5 py-0.5 rounded-md">ONLINE</span>'
+                    : '<span class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 px-1.5 py-0.5 rounded-md">OFFLINE</span>';
+
+                return `
+                    <button type="button" onclick="selectGlobalModel('${m.id}')"
+                        class="w-full px-3 py-2.5 rounded-xl text-left transition-all flex items-center justify-between gap-2 text-xs ${
+                            isSelected 
+                                ? 'bg-neon-50 dark:bg-neon-500/10 text-neon-800 dark:text-neon-300 font-bold border border-neon-200 dark:border-neon-500/30' 
+                                : 'hover:bg-slate-100 dark:hover:bg-[#111827] text-slate-700 dark:text-slate-300 font-medium'
+                        }">
+                        <div class="flex items-center gap-2 truncate">
+                            ${statusDot}
+                            <span class="font-mono text-xs truncate">${m.id}</span>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            ${statusBadge}
+                            <span class="text-[10px] text-slate-400 font-mono uppercase">${m.owned_by || 'HPC'}</span>
+                            ${isSelected ? '<i data-lucide="check" class="w-3.5 h-3.5 text-neon-600 dark:text-neon-400 shrink-0"></i>' : ''}
+                        </div>
+                    </button>
+                `;
+            }).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function onGlobalModelFilterChange(modelId) {
+            const currentObj = availableModelsList.find(m => m.id === modelId) || { id: modelId, status: 'offline' };
+            const isOnline = currentObj.status === 'online';
+
+            const playSelect = document.getElementById('play-model-select');
+            if (playSelect) {
+                playSelect.value = modelId;
+            }
+            const chatSelect = document.getElementById('chat-model-select');
+            if (chatSelect) {
+                chatSelect.value = modelId;
+            }
+            
+            const modelCardName = document.getElementById('metric-model-name');
+            if (modelCardName) {
+                modelCardName.innerText = modelId;
+            }
+
+            const modelUpstream = document.getElementById('metric-model-upstream');
+            if (modelUpstream) {
+                modelUpstream.innerText = currentObj.upstream_model || currentObj.id || 'Active Serving Weight';
+            }
+
+            const modelProvider = document.getElementById('metric-model-provider');
+            if (modelProvider) {
+                modelProvider.innerText = (currentObj.owned_by || 'HPC Cluster').toUpperCase();
+            }
+
+            // Update Card 1 Status Badge
+            const cardStatusBadge = document.getElementById('metric-model-status-badge');
+            if (cardStatusBadge) {
+                if (isOnline) {
+                    cardStatusBadge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 text-[10px] font-bold font-mono shadow-sm flex items-center gap-1.5';
+                    cardStatusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> ONLINE';
+                } else {
+                    cardStatusBadge.className = 'px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 text-[10px] font-bold font-mono flex items-center gap-1.5';
+                    cardStatusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> OFFLINE';
+                }
+            }
+
+            // Update Chat Studio Header & Controls
+            const chatHeaderName = document.getElementById('chat-header-model-name');
+            if (chatHeaderName) chatHeaderName.innerText = modelId;
+
+            const chatAvatar = document.getElementById('chat-model-avatar');
+            if (chatAvatar) chatAvatar.innerText = modelId.charAt(0).toUpperCase();
+
+            const chatSelectedPill = document.getElementById('chat-selected-model-pill');
+            if (chatSelectedPill) chatSelectedPill.innerText = modelId;
+
+            const chatStatus = document.getElementById('chat-header-status');
+            if (chatStatus) {
+                if (isOnline) {
+                    chatStatus.className = 'text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1';
+                    chatStatus.innerHTML = '<span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-neon-pulse"></span> Online • Ready for Inference';
+                } else {
+                    chatStatus.className = 'text-[10px] text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1';
+                    chatStatus.innerHTML = '<span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Offline • Tunnel Standby';
+                }
+            }
+
+            const chatFooterLabel = document.getElementById('chat-footer-model-label');
+            if (chatFooterLabel) chatFooterLabel.innerText = `model: ${modelId}`;
+
+            showToast(`Target Model: ${modelId} (${isOnline ? 'ONLINE' : 'OFFLINE'})`, isOnline ? 'success' : 'warning');
+        }
+
+        function refreshDashboardTelemetry() {
+            fetchRealtimeMetrics();
+            fetchModels();
+            fetchSlurmNodes();
+            fetchSlurmJobs();
+            checkSystemHealth();
+            showToast('Telemetry refreshed', 'info');
+        }
+
         async function fetchModels() {
             try {
                 const res = await fetch(`${GATEWAY_BASE}/v1/models`, {
-                    headers: { 'Authorization': `Bearer ${activeApiKey}` }
+                    headers: getAdminHeaders({ 'Authorization': `Bearer ${activeApiKey}` })
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    if (data && data.data && data.data.length > 0) {
-                        const select = document.getElementById('play-model-select');
-                        select.innerHTML = '';
-                        data.data.forEach(m => {
-                            const opt = document.createElement('option');
-                            opt.value = m.id;
-                            opt.textContent = m.id;
-                            select.appendChild(opt);
-                        });
-                        document.getElementById('metric-model-name').innerText = data.data[0].id;
+                    const models = data.data || [];
+                    if (models.length > 0) {
+                        availableModelsList = models;
+
+                        const playSelect = document.getElementById('play-model-select');
+                        const chatSelect = document.getElementById('chat-model-select');
+                        const keySelect = document.getElementById('page-key-model');
+                        const submitJobSelect = document.getElementById('submit-job-model');
+
+                        if (playSelect) {
+                            playSelect.innerHTML = '';
+                            availableModelsList.forEach(m => {
+                                const opt = document.createElement('option');
+                                opt.value = m.id;
+                                const isOnline = m.status === 'online';
+                                opt.textContent = `${m.id} [${isOnline ? 'ONLINE' : 'OFFLINE'}]`;
+                                playSelect.appendChild(opt);
+                            });
+                        }
+
+                        if (chatSelect) {
+                            chatSelect.innerHTML = '';
+                            availableModelsList.forEach(m => {
+                                const opt = document.createElement('option');
+                                opt.value = m.id;
+                                const isOnline = m.status === 'online';
+                                opt.textContent = `${m.id} [${isOnline ? 'ONLINE' : 'OFFLINE'}]`;
+                                chatSelect.appendChild(opt);
+                            });
+                        }
+
+                        if (keySelect) {
+                            keySelect.innerHTML = '<option value="*">All Models (*)</option>';
+                            availableModelsList.forEach(m => {
+                                const opt = document.createElement('option');
+                                opt.value = m.id;
+                                opt.textContent = m.id;
+                                keySelect.appendChild(opt);
+                            });
+                        }
+
+                        if (submitJobSelect) {
+                            submitJobSelect.innerHTML = '';
+                            availableModelsList.forEach(m => {
+                                const opt = document.createElement('option');
+                                opt.value = m.upstream_model || m.id;
+                                opt.textContent = `${m.id} (${m.upstream_model || 'Model Weight'})`;
+                                submitJobSelect.appendChild(opt);
+                            });
+                        }
+
+                        if (!availableModelsList.some(m => m.id === currentSelectedModel)) {
+                            currentSelectedModel = availableModelsList[0].id;
+                        }
+
+                        const label = document.getElementById('global-model-selected-label');
+                        if (label) label.innerText = currentSelectedModel;
+
+                        renderModelDropdownList();
+                        onGlobalModelFilterChange(currentSelectedModel);
                     }
                 }
             } catch (e) {
                 console.debug('Models fetch offline');
+                renderModelDropdownList();
             }
         }
 
@@ -2210,6 +2459,21 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                     document.getElementById('slurm-nodes-idle').innerText = `${idleCount} IDLE`;
                     document.getElementById('slurm-nodes-mixed').innerText = `${mixedCount} MIXED`;
                     document.getElementById('slurm-nodes-drain').innerText = `${drainCount} DRAIN`;
+
+                    // Update Top KPI Card 2 dynamically
+                    const gpuNodesCount = nodes.filter(n => (n.gres || '').toLowerCase().includes('gpu')).length;
+                    const vramUsageEl = document.getElementById('metric-vram-usage');
+                    if (vramUsageEl) vramUsageEl.innerText = `${nodes.length}`;
+                    const vramSubEl = document.getElementById('metric-vram-sub');
+                    if (vramSubEl) vramSubEl.innerText = `node(s) • ${gpuNodesCount} GPU active`;
+                    const nodeStatusEl = document.getElementById('metric-node-status');
+                    if (nodeStatusEl) nodeStatusEl.innerText = `${idleCount} IDLE • ${mixedCount} MIXED`;
+
+                    // Update Slurm Tab GPU summary card
+                    const slurmGpuCountEl = document.getElementById('slurm-gpu-count');
+                    if (slurmGpuCountEl) slurmGpuCountEl.innerText = `${gpuNodesCount}`;
+                    const slurmDriverInfoEl = document.getElementById('slurm-driver-info');
+                    if (slurmDriverInfoEl) slurmDriverInfoEl.innerText = `${gpuNodesCount} GPU node(s) available`;
                 }
             } catch (e) {
                 console.debug('Slurm nodes offline');
@@ -2618,7 +2882,7 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        model: 'qwen3.5-9b',
+                        model: currentSelectedModel || document.getElementById('chat-model-select')?.value || 'default-model',
                         messages: messagesPayload,
                         temperature: temp,
                         max_tokens: maxTokens,
@@ -2739,7 +3003,7 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
                 showToast('No conversation history to export', 'error');
                 return;
             }
-            let text = '# AI Local Qwen 3.5 Chat Transcript\n\n';
+            let text = `# AI Local LLM Chat Transcript (${currentSelectedModel || 'model'})\n\n`;
             conversationHistory.forEach(m => {
                 text += `### ${m.role.toUpperCase()}\n${m.content}\n\n`;
             });
@@ -2747,7 +3011,7 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `qwen_chat_${Date.now()}.md`;
+            a.download = `chat_${currentSelectedModel || 'llm'}_${Date.now()}.md`;
             a.click();
             URL.revokeObjectURL(url);
             showToast('Chat transcript exported as Markdown', 'success');

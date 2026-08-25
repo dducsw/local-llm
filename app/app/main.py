@@ -554,74 +554,69 @@ def get_telemetry():
 
 
 @app.get("/admin/slurm/status", dependencies=[Depends(require_admin)])
-def get_slurm_status():
-    # MOCK DATA for Slurm Jobs
+async def get_slurm_status():
+    nodes_res = await get_slurm_nodes()
+    jobs_res = await get_slurm_jobs()
     return {
-        "status": "mock",
-        "message": "SSH Key not configured. Showing mock data.",
-        "nodes": [
-            {
-                "node": "gpunode1",
-                "state": "MIXED",
-                "cpus": "32",
-                "memory": "128000",
-                "gres": "gpu:v100:1",
-                "partition": "gpu-v100"
-            },
-            {
-                "node": "gpunode2",
-                "state": "IDLE",
-                "cpus": "32",
-                "memory": "128000",
-                "gres": "gpu:v100:1",
-                "partition": "gpu-v100"
-            },
-            {
-                "node": "cpunode4",
-                "state": "ALLOCATED",
-                "cpus": "64",
-                "memory": "256000",
-                "gres": "(null)",
-                "partition": "cpu-queue"
-            }
-        ],
-        "jobs": [
-            {
-                "job_id": "100234",
-                "name": "vllm-serve",
-                "user": "hpc_user",
-                "partition": "gpu-v100",
-                "node": "gpunode1",
-                "gres": "gpu:v100:1",
-                "status": "RUNNING",
-                "time": "4:32:10"
-            },
-            {
-                "job_id": "100235",
-                "name": "hf_download",
-                "user": "hpc_user",
-                "partition": "cpu-queue",
-                "node": "cpunode4",
-                "gres": "(null)",
-                "status": "COMPLETED",
-                "time": "0:45:12"
-            }
-        ]
+        "status": "live",
+        "nodes": nodes_res.get("nodes", []),
+        "jobs": jobs_res.get("jobs", []),
     }
 
 
 @app.get("/v1/models")
-def models(identity: Identity = Depends(require_api_key)):
+async def models(
+    authorization: str | None = Header(default=None),
+    x_admin_session: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+):
+    token = x_admin_session or x_admin_token
+    is_admin = False
+    if token and (token in ADMIN_SESSIONS or (ADMIN_PASSWORD and secrets.compare_digest(token, ADMIN_PASSWORD)) or (ADMIN_TOKEN and secrets.compare_digest(token, ADMIN_TOKEN))):
+        is_admin = True
+    elif authorization and authorization.lower().startswith("bearer "):
+        raw = authorization.split(" ", 1)[1].strip()
+        if (ADMIN_PASSWORD and secrets.compare_digest(raw, ADMIN_PASSWORD)) or (ADMIN_TOKEN and secrets.compare_digest(raw, ADMIN_TOKEN)) or raw in ADMIN_SESSIONS:
+            is_admin = True
+
+    # Check live reachability of each upstream model backend
+    backend_status: dict[str, bool] = {}
+    async with httpx.AsyncClient(timeout=1.5) as client:
+        for model_id, cfg in MODELS.items():
+            try:
+                base_url = cfg["base_url"].rstrip("/")
+                r = await client.get(f"{base_url}/models")
+                backend_status[model_id] = (r.status_code == 200)
+            except Exception:
+                backend_status[model_id] = False
+
     data = []
-    for model_id, cfg in MODELS.items():
-        if allowed(identity, model_id):
+    if is_admin:
+        for model_id, cfg in MODELS.items():
+            is_online = backend_status.get(model_id, False)
             data.append(
                 {
                     "id": model_id,
                     "object": "model",
-                    "owned_by": cfg.get("owned_by", "self-hosted"),
+                    "status": "online" if is_online else "offline",
+                    "owned_by": cfg.get("owned_by", "hpc-cluster"),
+                    "upstream_model": cfg.get("upstream_model", model_id),
                 }
             )
+    else:
+        identity = require_api_key(authorization)
+        for model_id, cfg in MODELS.items():
+            if allowed(identity, model_id):
+                is_online = backend_status.get(model_id, False)
+                data.append(
+                    {
+                        "id": model_id,
+                        "object": "model",
+                        "status": "online" if is_online else "offline",
+                        "owned_by": cfg.get("owned_by", "hpc-cluster"),
+                        "upstream_model": cfg.get("upstream_model", model_id),
+                    }
+                )
     return {"object": "list", "data": data}
 
 
