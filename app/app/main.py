@@ -42,12 +42,16 @@ if not MODEL_CONFIG.is_absolute() and not MODEL_CONFIG.exists() and (ROOT_DIR / 
     MODEL_CONFIG = ROOT_DIR / MODEL_CONFIG
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", os.getenv("ADMIN_TOKEN", "admin123"))
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", os.getenv("ADMIN_TOKEN", ""))
+if not ADMIN_PASSWORD:
+    ADMIN_PASSWORD = secrets.token_urlsafe(16)
+    print(f"\n{'='*50}\nSECURITY WARNING: No ADMIN_PASSWORD set in .env!\nGenerated random admin password: {ADMIN_PASSWORD}\n{'='*50}\n")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", ADMIN_PASSWORD)
 UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT", "3600"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 ADMIN_SESSIONS: dict[str, float] = {}  # session_token -> expiry_timestamp
+LOGIN_ATTEMPTS: dict[str, list[float]] = defaultdict(list)  # ip -> list of timestamps
 
 logging.basicConfig(
     level=LOG_LEVEL,
@@ -205,7 +209,7 @@ def require_admin(
         token_to_check = authorization.split(" ", 1)[1].strip()
 
     if not token_to_check:
-        raise HTTPException(status_code=401, detail="Yêu cầu đăng nhập quản trị viên (Admin authentication required)")
+        raise HTTPException(status_code=401, detail="Administrator authentication required")
 
     # Check active session token
     if token_to_check in ADMIN_SESSIONS:
@@ -213,7 +217,7 @@ def require_admin(
             return
         else:
             ADMIN_SESSIONS.pop(token_to_check, None)
-            raise HTTPException(status_code=401, detail="Phiên đăng nhập đã hết hạn (Admin session expired)")
+            raise HTTPException(status_code=401, detail="Administrator session has expired")
 
     # Check direct master password / admin token
     if (ADMIN_PASSWORD and secrets.compare_digest(token_to_check, ADMIN_PASSWORD)) or (
@@ -221,7 +225,7 @@ def require_admin(
     ):
         return
 
-    raise HTTPException(status_code=401, detail="Thông tin xác thực quản trị viên không hợp lệ")
+    raise HTTPException(status_code=401, detail="Invalid administrator authentication credentials")
 
 
 
@@ -341,7 +345,18 @@ class LoginRequest(BaseModel):
 
 
 @app.post("/api/auth/login")
-def login(body: LoginRequest):
+def login(body: LoginRequest, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    
+    # Rate limit check (5 attempts per minute)
+    attempts = LOGIN_ATTEMPTS[ip]
+    attempts[:] = [t for t in attempts if now - t < 60]
+    if len(attempts) >= 5:
+        raise HTTPException(status_code=429, detail="Too many login attempts. Please try again later.")
+    
+    LOGIN_ATTEMPTS[ip].append(now)
+
     valid_user = secrets.compare_digest(body.username, ADMIN_USERNAME)
     valid_pass = (ADMIN_PASSWORD and secrets.compare_digest(body.password, ADMIN_PASSWORD)) or (
         ADMIN_TOKEN and secrets.compare_digest(body.password, ADMIN_TOKEN)
@@ -350,7 +365,7 @@ def login(body: LoginRequest):
     if not valid_user or not valid_pass:
         raise HTTPException(
             status_code=401,
-            detail="Tên đăng nhập hoặc mật khẩu quản trị viên không chính xác"
+            detail="Invalid administrator username or password"
         )
 
     session_token = "sess_" + secrets.token_urlsafe(32)
@@ -687,11 +702,11 @@ async def completions(
 
 
 DASHBOARD_HTML = r"""<!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Local HPC LLM API</title>
+<title>AI Local Gateway</title>
 <style>
 body { font-family: system-ui, sans-serif; max-width: 1050px; margin: 32px auto; padding: 0 18px; background:#fafafa; color:#111; }
 .card { background:white; border:1px solid #ddd; border-radius:12px; padding:18px; margin-bottom:18px; }
@@ -704,16 +719,16 @@ code { background:#eee; padding:2px 5px; border-radius:4px; }
 </style>
 </head>
 <body>
-<h1>Local HPC LLM API</h1>
-<p>Gateway chạy trên laptop, inference chạy trên HPC qua SSH tunnel.</p>
+<h1>AI Local Gateway</h1>
+<p>Gateway running on local server, inference on HPC via SSH tunnel.</p>
 
 <div class="card">
 <h2>1. Admin</h2>
 <label>ADMIN_TOKEN</label>
-<input id="adminToken" type="password" placeholder="admin token từ file .env">
+<input id="adminToken" type="password" placeholder="admin token from .env file">
 <div class="row">
   <div>
-    <label>Tên API key</label>
+    <label>API Key Name</label>
     <input id="keyName" value="my-python-client">
   </div>
   <div>
@@ -721,25 +736,25 @@ code { background:#eee; padding:2px 5px; border-radius:4px; }
     <input id="rpm" type="number" value="60">
   </div>
 </div>
-<label>Models</label>
+<label>Allowed Models</label>
 <input id="allowedModels" value="qwen2.5-32b">
-<button onclick="createKey()">Tạo API key</button>
-<button onclick="listKeys()">Xem keys</button>
-<pre id="adminOut">Chưa có dữ liệu.</pre>
-<small>Raw key chỉ được hiển thị một lần khi tạo.</small>
+<button onclick="createKey()">Generate API Key</button>
+<button onclick="listKeys()">List Keys</button>
+<pre id="adminOut">No data available.</pre>
+<small>Raw API key is only displayed once upon creation.</small>
 </div>
 
 <div class="card">
 <h2>2. Playground</h2>
-<label>API key</label>
+<label>API Key</label>
 <input id="apiKey" type="password" placeholder="sk-hpc-...">
-<button onclick="loadModels()">Load models</button>
+<button onclick="loadModels()">Load Models</button>
 <label>Model</label>
 <select id="model"></select>
 <label>Prompt</label>
-<textarea id="prompt">Giải thích Tensor Parallelism trong 5 câu.</textarea>
-<button onclick="sendChat()">Gửi request</button>
-<pre id="chatOut">Chưa có response.</pre>
+<textarea id="prompt">Explain Tensor Parallelism in 5 concise sentences.</textarea>
+<button onclick="sendChat()">Send Request</button>
+<pre id="chatOut">No response yet.</pre>
 </div>
 
 <div class="card">
@@ -1174,7 +1189,7 @@ async def get_slurm_jobs():
     return {"jobs": jobs}
 
 
-@app.post("/api/slurm/jobs/submit")
+@app.post("/api/slurm/jobs/submit", dependencies=[Depends(require_admin)])
 async def submit_slurm_job(body: SubmitJobRequest):
     """Submit new vLLM serving sbatch job on Slurm cluster (locally or via SSH)."""
     script_rel = "slurm/serving/vllm-singlegpu.sbatch"
@@ -1239,7 +1254,7 @@ async def submit_slurm_job(body: SubmitJobRequest):
     }
 
 
-@app.post("/api/slurm/jobs/{job_id}/cancel")
+@app.post("/api/slurm/jobs/{job_id}/cancel", dependencies=[Depends(require_admin)])
 async def cancel_slurm_job(job_id: str):
     """Cancel a running Slurm job via scancel (locally or via SSH)."""
     code, stdout, stderr = run_slurm_cli(["scancel", job_id])

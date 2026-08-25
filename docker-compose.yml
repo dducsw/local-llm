@@ -31,8 +31,7 @@ services:
       - ./app/config:/workspace/app/config
       # Live UI hot-reload without container rebuild
       - ./app/ui:/workspace/app/ui
-      # Optional: Mount host SSH key to allow Slurm supervision over SSH
-      - ~/.ssh:/root/.ssh:ro
+      # SSH key mount removed for security. If needed, mount a specific key file (e.g. ./secrets/id_rsa:/root/.ssh/id_rsa:ro)
 
     # Prevent runaway container log files on disk
     logging:
