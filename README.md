@@ -51,6 +51,20 @@ flowchart TB
     SSH -->|"TCP / Port 8000"| VLLM
 ```
 
+## 🖥️ Dashboard Screenshots
+
+### Telemetry & Models
+
+![Telemetry and Models dashboard](assets/telemetry.png)
+
+### Slurm HPC Cluster
+
+![Slurm HPC Cluster dashboard](assets/slurm.png)
+
+### AI Chat Studio
+
+![AI Chat Studio dashboard](assets/chat.png)
+
 ---
 
 ## ✨ Key Capabilities
