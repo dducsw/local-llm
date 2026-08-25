@@ -310,15 +310,16 @@ HPC_SSH_KEY = os.getenv("HPC_SSH_KEY", "")
 if not HPC_SSH_KEY and os.path.exists("/run/secrets/hpc_ssh_key"):
     HPC_SSH_KEY = "/run/secrets/hpc_ssh_key"
 HPC_REMOTE_DIR = os.getenv("HPC_REMOTE_DIR", "~/local-llm/infra")
+HPC_SLURM_ACCOUNT = os.getenv("HPC_SLURM_ACCOUNT", "summer-school")
 
 
-def run_slurm_cli(cmd_args: list[str], timeout: float = 8.0) -> tuple[int, str, str]:
+def run_slurm_cli(cmd_args: list[str], timeout: float = 8.0, work_dir: str | None = None) -> tuple[int, str, str]:
     """Execute Slurm command locally if tools exist, or over SSH if running on remote VM."""
     binary = cmd_args[0]
     # 1. Local execution if binary installed
     if shutil.which(binary):
         try:
-            res = subprocess.run(cmd_args, capture_output=True, text=True, timeout=timeout)
+            res = subprocess.run(cmd_args, cwd=work_dir, capture_output=True, text=True, timeout=timeout)
             if res.returncode != 0:
                 log.warning("Local %s failed (code %s): %s", binary, res.returncode, res.stderr.strip())
             return res.returncode, res.stdout, res.stderr
@@ -329,7 +330,11 @@ def run_slurm_cli(cmd_args: list[str], timeout: float = 8.0) -> tuple[int, str, 
     # 2. Remote SSH execution if HPC_SSH_HOST configured (VM -> HPC)
     if HPC_SSH_HOST and HPC_SSH_HOST != "your-host":
         try:
-            remote_cmd_str = " ".join(f"'{arg}'" if " " in arg or "%" in arg else arg for arg in cmd_args)
+            cmd_str = " ".join(f"'{arg}'" if (" " in arg or "%" in arg) else arg for arg in cmd_args)
+            if work_dir:
+                remote_cmd_str = f"cd {work_dir} && {cmd_str}"
+            else:
+                remote_cmd_str = cmd_str
             ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
             if HPC_SSH_KEY and os.path.exists(os.path.expanduser(HPC_SSH_KEY)):
                 ssh_cmd.extend(["-i", os.path.expanduser(HPC_SSH_KEY)])
@@ -1444,7 +1449,7 @@ class SubmitJobRequest(BaseModel):
     model: str = "Qwen3.5-9B-Q4_K_M.gguf"
     partition: str = "gpu-queue"
     gres: str = "gpu:1"
-    time_limit: str = "04:00:00"
+    time_limit: str = "01:00:00"
     tp: int = 1
 
 
@@ -1485,15 +1490,20 @@ async def get_slurm_jobs():
 async def submit_slurm_job(body: SubmitJobRequest):
     """Submit new vLLM serving sbatch job on Slurm cluster and auto-connect SSH tunnel."""
     script_rel = "slurm/serving/vllm-singlegpu.sbatch"
+    time_limit = body.time_limit.strip() if body.time_limit else "01:00:00"
+
+    submit_cmd = [
+        "sbatch",
+        f"--partition={body.partition}",
+        f"--time={time_limit}",
+    ]
+    if HPC_SLURM_ACCOUNT:
+        submit_cmd.append(f"--account={HPC_SLURM_ACCOUNT}")
+    submit_cmd.append(script_rel)
 
     # If running on VM via SSH:
     if HPC_SSH_HOST:
-        remote_submit_cmd = [
-            "bash",
-            "-lc",
-            f"cd {HPC_REMOTE_DIR} && sbatch --partition={body.partition} --time={body.time_limit} {script_rel}",
-        ]
-        code, stdout, stderr = run_slurm_cli(remote_submit_cmd, timeout=12.0)
+        code, stdout, stderr = run_slurm_cli(submit_cmd, timeout=15.0, work_dir=HPC_REMOTE_DIR)
         if code == 0 and "Submitted batch job" in stdout:
             job_id = stdout.strip().split()[-1]
             # Automatically start background watcher to connect SSH tunnel when job is RUNNING

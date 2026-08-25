@@ -27,7 +27,8 @@ services:
       - ./app/data:/workspace/app/data
       # Models configuration
       - ./app/config:/workspace/app/config
-      # Live UI hot-reload without container rebuild
+      # Live UI & App hot-reload without container rebuild
+      - ./app/app:/workspace/app/app
       - ./app/ui:/workspace/app/ui
 
     secrets:

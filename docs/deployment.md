@@ -151,11 +151,12 @@ ADMIN_PASSWORD=your_super_secret_password
 ADMIN_TOKEN=your_super_secret_admin_token
 
 # 2. HPC Supervision Settings (Secured via Docker Secrets)
-HPC_SSH_HOST=hpc-login.gitc
-HPC_SSH_USER=hpc_user
+HPC_SSH_HOST=10.1.1.239
+HPC_SSH_USER=ducledinh
 HPC_HOST_SSH_KEY=/root/.ssh/id_ed25519
 HPC_SSH_KEY=/run/secrets/hpc_ssh_key
-HPC_REMOTE_DIR=~/local-llm/infra
+HPC_REMOTE_DIR=/home/ducledinh/dev/local-llm/infra
+HPC_SLURM_ACCOUNT=summer-school
 ```
 
 > [!TIP]
