@@ -316,6 +316,7 @@ app = FastAPI(
 
 
 @app.get("/healthz")
+@app.get("/health")
 def healthz():
     return {"status": "ok"}
 
@@ -1159,22 +1160,28 @@ def run_slurm_cli(cmd_args: list[str], timeout: float = 8.0) -> tuple[int, str, 
     if shutil.which(binary):
         try:
             res = subprocess.run(cmd_args, capture_output=True, text=True, timeout=timeout)
+            if res.returncode != 0:
+                log.warning("Local %s failed (code %s): %s", binary, res.returncode, res.stderr.strip())
             return res.returncode, res.stdout, res.stderr
         except Exception as e:
+            log.warning("Local %s exception: %s", binary, e)
             return 1, "", str(e)
 
     # 2. Remote SSH execution if HPC_SSH_HOST configured (VM -> HPC)
-    if HPC_SSH_HOST:
+    if HPC_SSH_HOST and HPC_SSH_HOST != "your-host":
         try:
             remote_cmd_str = " ".join(f"'{arg}'" if " " in arg or "%" in arg else arg for arg in cmd_args)
             ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
-            if HPC_SSH_KEY:
+            if HPC_SSH_KEY and os.path.exists(os.path.expanduser(HPC_SSH_KEY)):
                 ssh_cmd.extend(["-i", os.path.expanduser(HPC_SSH_KEY)])
             target = f"{HPC_SSH_USER}@{HPC_SSH_HOST}" if HPC_SSH_USER else HPC_SSH_HOST
             ssh_cmd.extend([target, remote_cmd_str])
             res = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=timeout)
+            if res.returncode != 0:
+                log.warning("SSH to %s failed (code %s): %s", target, res.returncode, res.stderr.strip())
             return res.returncode, res.stdout, res.stderr
         except Exception as e:
+            log.warning("SSH to %s exception: %s", HPC_SSH_HOST, e)
             return 1, "", str(e)
 
     return 127, "", f"Command '{binary}' not found and HPC_SSH_HOST not configured"

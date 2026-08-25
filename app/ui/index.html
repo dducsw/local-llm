@@ -983,10 +983,10 @@
                     <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
                         <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Slurm Cluster Status</span>
                         <div class="flex items-center gap-2">
-                            <span class="w-3 h-3 bg-neon-500 rounded-full animate-neon-pulse"></span>
-                            <span class="text-xl font-extrabold text-slate-900 dark:text-white">OPERATIONAL</span>
+                            <span id="slurm-cluster-status-dot" class="w-3 h-3 bg-amber-500 rounded-full animate-neon-pulse"></span>
+                            <span id="slurm-cluster-status-text" class="text-xl font-extrabold text-slate-900 dark:text-white">STANDBY</span>
                         </div>
-                        <span class="text-xs text-slate-400 block font-mono">gpu-v100, gpu-queue</span>
+                        <span id="slurm-cluster-status-sub" class="text-xs text-slate-400 block font-mono">Slurm Cluster Telemetry</span>
                     </div>
 
                     <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
@@ -2415,46 +2415,69 @@
                     let mixedCount = 0;
                     let drainCount = 0;
 
-                    tbody.innerHTML = nodes.map(n => {
-                        const stateStr = (n.state || '').toLowerCase();
-                        let badgeClass = 'bg-slate-50 dark:bg-[#111827] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300';
-                        if (stateStr.includes('idle')) {
-                            badgeClass = 'bg-neon-50 dark:bg-neon-500/10 border-neon-200 dark:border-neon-500/30 text-neon-800 dark:text-neon-400';
-                            idleCount++;
-                        } else if (stateStr.includes('mix')) {
-                            badgeClass = 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400';
-                            mixedCount++;
-                        } else if (stateStr.includes('drain') || stateStr.includes('down')) {
-                            badgeClass = 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400';
-                            drainCount++;
-                        } else if (stateStr.includes('alloc')) {
-                            badgeClass = 'bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-400';
-                        }
-
-                        let memDisplay = n.memory;
-                        const memNum = parseInt(n.memory, 10);
-                        if (!isNaN(memNum)) {
-                            memDisplay = `${(memNum / 1024).toFixed(0)} GB (${memNum.toLocaleString()} MB)`;
-                        }
-
-                        return `
-                            <tr class="hover:bg-slate-50 dark:hover:bg-[#111827]/50 transition-colors">
-                                <td class="p-3.5 font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                    <span class="w-2 h-2 ${stateStr.includes('idle') ? 'bg-neon-500' : stateStr.includes('mix') ? 'bg-amber-500' : 'bg-rose-500'} rounded-full"></span>
-                                    <span>${n.node}</span>
+                    if (nodes.length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="p-6 text-center text-slate-400 font-sans">
+                                    No Slurm nodes detected via local sinfo or SSH. Configure <code>HPC_SSH_HOST</code> and <code>HPC_SSH_USER</code> in <code>.env</code> to supervise your remote HPC cluster.
                                 </td>
-                                <td class="p-3.5">
-                                    <span class="px-2.5 py-0.5 rounded-full border font-bold text-[10px] uppercase ${badgeClass}">
-                                        ${n.state}
-                                    </span>
-                                </td>
-                                <td class="p-3.5 text-slate-700 dark:text-slate-300 font-mono font-medium">${n.cpus}</td>
-                                <td class="p-3.5 text-slate-600 dark:text-slate-400">${memDisplay}</td>
-                                <td class="p-3.5 text-slate-800 dark:text-slate-200 font-bold font-mono text-neon-700 dark:text-neon-400">${n.gres}</td>
-                                <td class="p-3.5 text-slate-600 dark:text-slate-400">${n.partition}</td>
                             </tr>
                         `;
-                    }).join('');
+                        const statusText = document.getElementById('slurm-cluster-status-text');
+                        if (statusText) statusText.innerText = 'STANDBY';
+                        const statusDot = document.getElementById('slurm-cluster-status-dot');
+                        if (statusDot) statusDot.className = 'w-3 h-3 bg-amber-500 rounded-full';
+                        const statusSub = document.getElementById('slurm-cluster-status-sub');
+                        if (statusSub) statusSub.innerText = 'Configure HPC_SSH_HOST in .env';
+                    } else {
+                        tbody.innerHTML = nodes.map(n => {
+                            const stateStr = (n.state || '').toLowerCase();
+                            let badgeClass = 'bg-slate-50 dark:bg-[#111827] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300';
+                            if (stateStr.includes('idle')) {
+                                badgeClass = 'bg-neon-50 dark:bg-neon-500/10 border-neon-200 dark:border-neon-500/30 text-neon-800 dark:text-neon-400';
+                                idleCount++;
+                            } else if (stateStr.includes('mix')) {
+                                badgeClass = 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400';
+                                mixedCount++;
+                            } else if (stateStr.includes('drain') || stateStr.includes('down')) {
+                                badgeClass = 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400';
+                                drainCount++;
+                            } else if (stateStr.includes('alloc')) {
+                                badgeClass = 'bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-400';
+                            }
+
+                            let memDisplay = n.memory;
+                            const memNum = parseInt(n.memory, 10);
+                            if (!isNaN(memNum)) {
+                                memDisplay = `${(memNum / 1024).toFixed(0)} GB (${memNum.toLocaleString()} MB)`;
+                            }
+
+                            return `
+                                <tr class="hover:bg-slate-50 dark:hover:bg-[#111827]/50 transition-colors">
+                                    <td class="p-3.5 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                        <span class="w-2 h-2 ${stateStr.includes('idle') ? 'bg-neon-500' : stateStr.includes('mix') ? 'bg-amber-500' : 'bg-rose-500'} rounded-full"></span>
+                                        <span>${n.node}</span>
+                                    </td>
+                                    <td class="p-3.5">
+                                        <span class="px-2.5 py-0.5 rounded-full border font-bold text-[10px] uppercase ${badgeClass}">
+                                            ${n.state}
+                                        </span>
+                                    </td>
+                                    <td class="p-3.5 text-slate-700 dark:text-slate-300 font-mono font-medium">${n.cpus}</td>
+                                    <td class="p-3.5 text-slate-600 dark:text-slate-400">${memDisplay}</td>
+                                    <td class="p-3.5 text-slate-800 dark:text-slate-200 font-bold font-mono text-neon-700 dark:text-neon-400">${n.gres}</td>
+                                    <td class="p-3.5 text-slate-600 dark:text-slate-400">${n.partition}</td>
+                                </tr>
+                            `;
+                        }).join('');
+
+                        const statusText = document.getElementById('slurm-cluster-status-text');
+                        if (statusText) statusText.innerText = 'OPERATIONAL';
+                        const statusDot = document.getElementById('slurm-cluster-status-dot');
+                        if (statusDot) statusDot.className = 'w-3 h-3 bg-neon-500 rounded-full animate-neon-pulse';
+                        const statusSub = document.getElementById('slurm-cluster-status-sub');
+                        if (statusSub) statusSub.innerText = `${nodes.length} Nodes Connected`;
+                    }
 
                     document.getElementById('slurm-nodes-idle').innerText = `${idleCount} IDLE`;
                     document.getElementById('slurm-nodes-mixed').innerText = `${mixedCount} MIXED`;
