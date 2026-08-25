@@ -1,0 +1,625 @@
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:105: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+INFO 08-17 21:25:12 [__init__.py:239] Automatically detected platform cuda.
+INFO 08-17 21:25:20 [api_server.py:1043] vLLM API server version 0.8.5.post2.dev0+g3015d56.d20260817
+INFO 08-17 21:25:20 [api_server.py:1044] args: Namespace(subparser='serve', model_tag='/home/u001013/.cache/llm-serving/huggingface/hub/models--Qwen--Qwen3-235B-A22B-GPTQ-Int4/snapshots/dff138951f3898772fc0d795a4b5b30f417577f4', config='', host='0.0.0.0', port=50380, uvicorn_log_level='info', disable_uvicorn_access_log=False, allow_credentials=False, allowed_origins=['*'], allowed_methods=['*'], allowed_headers=['*'], api_key=None, lora_modules=None, prompt_adapters=None, chat_template=None, chat_template_content_format='auto', response_role='assistant', ssl_keyfile=None, ssl_certfile=None, ssl_ca_certs=None, enable_ssl_refresh=False, ssl_cert_reqs=0, root_path=None, middleware=[], return_tokens_as_token_ids=False, disable_frontend_multiprocessing=False, enable_request_id_headers=False, enable_auto_tool_choice=False, tool_call_parser=None, tool_parser_plugin='', model='/home/u001013/.cache/llm-serving/huggingface/hub/models--Qwen--Qwen3-235B-A22B-GPTQ-Int4/snapshots/dff138951f3898772fc0d795a4b5b30f417577f4', task='auto', tokenizer=None, hf_config_path=None, skip_tokenizer_init=False, revision=None, code_revision=None, tokenizer_revision=None, tokenizer_mode='auto', trust_remote_code=False, allowed_local_media_path=None, load_format='auto', download_dir=None, model_loader_extra_config={}, use_tqdm_on_load=True, config_format=<ConfigFormat.AUTO: 'auto'>, dtype='half', max_model_len=4096, guided_decoding_backend='xgrammar', reasoning_parser=None, logits_processor_pattern=None, model_impl='auto', distributed_executor_backend='ray', pipeline_parallel_size=2, tensor_parallel_size=4, data_parallel_size=1, enable_expert_parallel=False, max_parallel_loading_workers=None, ray_workers_use_nsight=False, disable_custom_all_reduce=True, block_size=None, gpu_memory_utilization=0.9, swap_space=4, kv_cache_dtype='auto', num_gpu_blocks_override=None, enable_prefix_caching=None, prefix_caching_hash_algo='builtin', cpu_offload_gb=0, calculate_kv_scales=False, disable_sliding_window=False, use_v2_block_manager=True, seed=None, max_logprobs=20, disable_log_stats=False, quantization='gptq', rope_scaling=None, rope_theta=None, hf_token=None, hf_overrides=None, enforce_eager=False, max_seq_len_to_capture=8192, tokenizer_pool_size=0, tokenizer_pool_type='ray', tokenizer_pool_extra_config={}, limit_mm_per_prompt={}, mm_processor_kwargs=None, disable_mm_preprocessor_cache=False, enable_lora=None, enable_lora_bias=False, max_loras=1, max_lora_rank=16, lora_extra_vocab_size=256, lora_dtype='auto', long_lora_scaling_factors=None, max_cpu_loras=None, fully_sharded_loras=False, enable_prompt_adapter=None, max_prompt_adapters=1, max_prompt_adapter_token=0, device='auto', speculative_config=None, ignore_patterns=[], served_model_name=['qwen3-235b-a22b-int4'], qlora_adapter_name_or_path=None, show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, disable_async_output_proc=False, max_num_batched_tokens=None, max_num_seqs=16, max_num_partial_prefills=1, max_long_partial_prefills=1, long_prefill_token_threshold=0, num_lookahead_slots=0, scheduler_delay_factor=0.0, preemption_mode=None, num_scheduler_steps=1, multi_step_stream_outputs=True, scheduling_policy='fcfs', enable_chunked_prefill=None, disable_chunked_mm_input=False, scheduler_cls='vllm.core.scheduler.Scheduler', override_neuron_config=None, override_pooler_config=None, compilation_config=None, kv_transfer_config=None, worker_cls='auto', worker_extension_cls='', generation_config='vllm', override_generation_config=None, enable_sleep_mode=False, additional_config=None, enable_reasoning=False, disable_cascade_attn=False, disable_log_requests=False, max_log_len=None, disable_fastapi_docs=False, enable_prompt_tokens_details=False, enable_server_load_tracking=False, dispatch_function=<function ServeSubcommand.cmd at 0x7f7d5f17f6a0>)
+INFO 08-17 21:25:31 [config.py:717] This model supports multiple tasks: {'generate', 'reward', 'classify', 'embed', 'score'}. Defaulting to 'generate'.
+INFO 08-17 21:25:32 [gptq_bitblas.py:168] Detected that the model can run with gptq_bitblas, however you specified quantization=gptq explicitly, so forcing gptq. Use quantization=gptq_bitblas for faster inference
+WARNING 08-17 21:25:32 [config.py:830] gptq quantization is not fully optimized yet. The speed can be slower than non-quantized models.
+INFO 08-17 21:25:32 [llm_engine.py:240] Initializing a V0 LLM engine (v0.8.5.post2.dev0+g3015d56.d20260817) with config: model='/home/u001013/.cache/llm-serving/huggingface/hub/models--Qwen--Qwen3-235B-A22B-GPTQ-Int4/snapshots/dff138951f3898772fc0d795a4b5b30f417577f4', speculative_config=None, tokenizer='/home/u001013/.cache/llm-serving/huggingface/hub/models--Qwen--Qwen3-235B-A22B-GPTQ-Int4/snapshots/dff138951f3898772fc0d795a4b5b30f417577f4', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.float16, max_seq_len=4096, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=4, pipeline_parallel_size=2, disable_custom_all_reduce=True, quantization=gptq, enforce_eager=False, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='xgrammar', reasoning_backend=None), observability_config=ObservabilityConfig(show_hidden_metrics=False, otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=None, served_model_name=qwen3-235b-a22b-int4, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=None, chunked_prefill_enabled=False, use_async_output_proc=False, disable_mm_preprocessor_cache=False, mm_processor_kwargs=None, pooler_config=None, compilation_config={"splitting_ops":[],"compile_sizes":[],"cudagraph_capture_sizes":[16,8,4,2,1],"max_capture_size":16}, use_cached_outputs=False, 
+2026-08-17 21:25:32,892	INFO worker.py:1554 -- Using address 10.1.1.238:50000 set in the environment variable RAY_ADDRESS
+2026-08-17 21:25:32,892	INFO worker.py:1694 -- Connecting to existing Ray cluster at address: 10.1.1.238:50000...
+2026-08-17 21:25:32,904	INFO worker.py:1888 -- Connected to Ray cluster.
+INFO 08-17 21:25:32 [ray_utils.py:335] No current placement group found. Creating a new placement group.
+INFO 08-17 21:25:33 [ray_distributed_executor.py:176] use_ray_spmd_worker: False
+[36m(pid=2480512)[0m /usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:105: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+[36m(pid=2480512)[0m   warnings.warn(
+[36m(pid=2480512)[0m INFO 08-17 21:25:36 [__init__.py:239] Automatically detected platform cuda.
+[36m(pid=1819364, ip=10.1.1.236)[0m /usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:105: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.[32m [repeated 5x across cluster] (Ray deduplicates logs by default. Set RAY_DEDUP_LOGS=0 to disable log deduplication, or see https://docs.ray.io/en/master/ray-observability/user-guides/configure-logging.html#log-deduplication for more options.)[0m
+[36m(pid=1819364, ip=10.1.1.236)[0m   warnings.warn([32m [repeated 5x across cluster][0m
+[36m(pid=1819364, ip=10.1.1.236)[0m INFO 08-17 21:25:43 [__init__.py:239] Automatically detected platform cuda.[32m [repeated 5x across cluster][0m
+INFO 08-17 21:25:48 [ray_distributed_executor.py:352] non_carry_over_env_vars from config: set()
+INFO 08-17 21:25:48 [ray_distributed_executor.py:354] Copying the following environment variables to workers: ['VLLM_CACHE_ROOT', 'VLLM_PORT', 'VLLM_NCCL_SO_PATH', 'LD_LIBRARY_PATH', 'VLLM_USAGE_SOURCE', 'VLLM_ATTENTION_BACKEND', 'VLLM_WORKER_MULTIPROC_METHOD', 'VLLM_USE_V1']
+INFO 08-17 21:25:48 [ray_distributed_executor.py:357] If certain env vars should NOT be copied to workers, add them to /home/u001013/.config/vllm/ray_non_carry_over_env_vars.json file
+INFO 08-17 21:25:48 [cuda.py:228] Using XFormers backend.
+WARNING[XFORMERS]: xFormers can't load C++/CUDA extensions. xFormers was built for:
+    PyTorch 2.6.0+cu124 with CUDA 1204 (you have 2.6.0+cu124)
+    Python  3.12.8 (you have 3.12.10)
+  Please reinstall xformers (see https://github.com/facebookresearch/xformers#installing-xformers)
+  Memory-efficient attention, SwiGLU, sparse and more won't be available.
+  Set XFORMERS_MORE_DETAILS=1 for more details
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m INFO 08-17 21:25:49 [cuda.py:228] Using XFormers backend.
+[36m(pid=1819365, ip=10.1.1.236)[0m INFO 08-17 21:25:43 [__init__.py:239] Automatically detected platform cuda.[32m [repeated 2x across cluster][0m
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m WARNING[XFORMERS]: xFormers can't load C++/CUDA extensions. xFormers was built for:
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m     PyTorch 2.6.0+cu124 with CUDA 1204 (you have 2.6.0+cu124)
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m     Python  3.12.8 (you have 3.12.10)
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m   Please reinstall xformers (see https://github.com/facebookresearch/xformers#installing-xformers)
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m   Memory-efficient attention, SwiGLU, sparse and more won't be available.
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m   Set XFORMERS_MORE_DETAILS=1 for more details
+[36m(pid=1819365, ip=10.1.1.236)[0m /usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:105: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.[32m [repeated 2x across cluster][0m
+[36m(pid=1819365, ip=10.1.1.236)[0m   warnings.warn([32m [repeated 2x across cluster][0m
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m INFO 08-17 21:25:54 [cuda.py:228] Using XFormers backend.[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m WARNING[XFORMERS]: xFormers can't load C++/CUDA extensions. xFormers was built for:[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m     PyTorch 2.6.0+cu124 with CUDA 1204 (you have 2.6.0+cu124)[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m     Python  3.12.8 (you have 3.12.10)[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m   Please reinstall xformers (see https://github.com/facebookresearch/xformers#installing-xformers)[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m   Memory-efficient attention, SwiGLU, sparse and more won't be available.[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m   Set XFORMERS_MORE_DETAILS=1 for more details[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m [VLLM_GLOO_RANK_RANGE] rank=5/8 range=50525-50549
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m [GLOO_PORT_RANGE] pid=1819364 bound listener port=50525 range=50525-50549
+[VLLM_GLOO_RANK_RANGE] rank=0/8 range=50400-50424
+[GLOO_PORT_RANGE] pid=2481912 bound listener port=50400 range=50400-50424
+[VLLM_GLOO_RANK_RANGE] rank=0/8 range=50400-50424
+[GLOO_PORT_RANGE] pid=2481912 bound listener port=50401 range=50400-50424
+INFO 08-17 21:25:56 [utils.py:1045] Found nccl from environment variable VLLM_NCCL_SO_PATH=/home/u001013/llm_serving/build/torch-gloo-port/pytorch/build/nccl/lib/libnccl.so.2.21.5
+INFO 08-17 21:25:56 [pynccl.py:69] vLLM is using nccl==2.21.5
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_SOCKET_FAMILY set by environment to AF_INET
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_SOCKET_IFNAME set by environment to =ens11f0
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_SOCKET_IFNAME set to =ens11f0
+gpunode1:2481912:2481912 [0] NCCL INFO Bootstrap : Using ens11f0:10.1.1.238<0>
+gpunode1:2481912:2481912 [0] NCCL INFO NET/Plugin: No plugin found (libnccl-net.so)
+gpunode1:2481912:2481912 [0] NCCL INFO NET/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-net.so
+gpunode1:2481912:2481912 [0] NCCL INFO NET/Plugin: Using internal network plugin.
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50600
+gpunode1:2481912:2481912 [0] NCCL INFO cudaDriverVersion 13000
+NCCL version 2.21.5+cuda12.4
+[36m(RayWorkerWrapper pid=2480505)[0m INFO 08-17 21:25:56 [utils.py:1045] Found nccl from environment variable VLLM_NCCL_SO_PATH=/home/u001013/llm_serving/build/torch-gloo-port/pytorch/build/nccl/lib/libnccl.so.2.21.5
+[36m(RayWorkerWrapper pid=2480505)[0m INFO 08-17 21:25:56 [pynccl.py:69] vLLM is using nccl==2.21.5
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO cudaDriverVersion 13000
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO NCCL_SOCKET_FAMILY set by environment to AF_INET
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO NCCL_SOCKET_IFNAME set by environment to =ens11f0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO NCCL_SOCKET_IFNAME set to =ens11f0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Bootstrap : Using ens11f0:10.1.1.238<0>
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO NET/Plugin: No plugin found (libnccl-net.so)
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO NET/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-net.so
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO NET/Plugin: Using internal network plugin.
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50600
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m NCCL version 2.21.5+cuda12.4
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_IB_DISABLE set by environment to 1.
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_SOCKET_FAMILY set by environment to AF_INET
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_SOCKET_IFNAME set by environment to =ens11f0
+gpunode1:2481912:2481912 [0] NCCL INFO NET/Socket : Using [0]ens11f0:10.1.1.238<0>
+gpunode1:2481912:2481912 [0] NCCL INFO Using non-device net plugin version 0
+gpunode1:2481912:2481912 [0] NCCL INFO Using network Socket
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50601
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50602
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50612
+gpunode1:2481912:2481912 [0] NCCL INFO ncclCommInitRank comm 0xe0e0680 rank 0 nranks 4 cudaDev 0 nvmlDev 0 busId 15000 commId 0x2dbd318c6ddd186c - Init START
+gpunode1:2481912:2481912 [0] NCCL INFO NET/Socket : GPU Direct RDMA Disabled for HCA 0 'ens11f0'
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_CUMEM_ENABLE set by environment to 0.
+gpunode1:2481912:2481912 [0] NCCL INFO Setting affinity for GPU 0 to ff
+gpunode1:2481912:2481912 [0] NCCL INFO NVLS multicast support is not available on dev 0
+gpunode1:2481912:2481912 [0] NCCL INFO comm 0xe0e0680 rank 0 nRanks 4 nNodes 1 localRanks 4 localRank 0 MNNVL 0
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 00/08 :    0   1   2   3
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 01/08 :    0   3   2   1
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 02/08 :    0   3   1   2
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 03/08 :    0   2   1   3
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 04/08 :    0   1   2   3
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 05/08 :    0   3   2   1
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 06/08 :    0   3   1   2
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 07/08 :    0   2   1   3
+gpunode1:2481912:2481912 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 3/-1/-1->0->-1 [2] 3/-1/-1->0->-1 [3] 2/-1/-1->0->-1 [4] 1/-1/-1->0->-1 [5] 3/-1/-1->0->-1 [6] 3/-1/-1->0->-1 [7] 2/-1/-1->0->-1
+gpunode1:2481912:2481912 [0] NCCL INFO P2P Chunksize set to 524288
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 0 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c004fd0
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 1 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005048
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 2 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c0050c0
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 3 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005138
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/IPC
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy send connection 4 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c0051b0
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 04/0 : 0[0] -> 1[1] via P2P/IPC
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy send connection 5 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005228
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 6 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c0052a0
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 7 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005318
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 03/0 : 0[0] -> 2[2] via P2P/IPC
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy send connection 8 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005390
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 07/0 : 0[0] -> 2[2] via P2P/IPC
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy send connection 9 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005408
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 10 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005480
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 11 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c0054f8
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 01/0 : 0[0] -> 3[3] via P2P/IPC
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy send connection 12 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005570
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 02/0 : 0[0] -> 3[3] via P2P/IPC
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy send connection 13 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c0055e8
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 05/0 : 0[0] -> 3[3] via P2P/IPC
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy send connection 14 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005660
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 06/0 : 0[0] -> 3[3] via P2P/IPC
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy send connection 15 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c0056d8
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO NCCL_IB_DISABLE set by environment to 1.
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO NET/Socket : Using [0]ens11f0:10.1.1.236<0>
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Using non-device net plugin version 0
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Using network Socket
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50606
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50607
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50610
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO ncclCommInitRank comm 0xd163210 rank 0 nranks 4 cudaDev 0 nvmlDev 0 busId 15000 commId 0x354d7c01bfa0f4ed - Init START
+gpunode1:2481912:2481912 [0] NCCL INFO Connected all rings
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 16 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005750
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 17 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c0057c8
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 18 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005840
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 19 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c0058b8
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 20 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005930
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 21 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c0059a8
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 22 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005a20
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy recv connection 23 from local rank 0, transport 0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005a98
+gpunode1:2481912:2481912 [0] NCCL INFO Connected all trees
+gpunode1:2481912:2481912 [0] NCCL INFO threadThresholds 8/8/64 | 32/8/64 | 512 | 512
+gpunode1:2481912:2481912 [0] NCCL INFO 8 coll channels, 8 collnet channels, 0 nvls channels, 8 p2p channels, 2 p2p channels per peer
+gpunode1:2481912:2482847 [0] NCCL INFO New proxy send connection 24 from local rank 0, transport 2
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f567c005b10
+gpunode1:2481912:2481912 [0] NCCL INFO TUNER/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-tuner.so
+gpunode1:2481912:2481912 [0] NCCL INFO TUNER/Plugin: Using internal tuner plugin.
+gpunode1:2481912:2481912 [0] NCCL INFO ncclCommInitRank comm 0xe0e0680 rank 0 nranks 4 cudaDev 0 nvmlDev 0 busId 15000 commId 0x2dbd318c6ddd186c - Init COMPLETE
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO NET/Socket : GPU Direct RDMA Disabled for HCA 0 'ens11f0'
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO NCCL_CUMEM_ENABLE set by environment to 0.
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Setting affinity for GPU 3 to ff
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO NVLS multicast support is not available on dev 3
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO comm 0xe463030 rank 3 nRanks 4 nNodes 1 localRanks 4 localRank 3 MNNVL 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Trees [0] -1/-1/-1->3->2 [1] 2/-1/-1->3->0 [2] 2/-1/-1->3->0 [3] 1/-1/-1->3->2 [4] -1/-1/-1->3->2 [5] 2/-1/-1->3->0 [6] 2/-1/-1->3->0 [7] 1/-1/-1->3->2
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO P2P Chunksize set to 524288
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 0 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894004f40
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 1 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894004fb8
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 00/0 : 3[3] -> 0[0] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 2 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005030
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 03/0 : 3[3] -> 0[0] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 3 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa8940050a8
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 04/0 : 3[3] -> 0[0] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 4 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005120
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 07/0 : 3[3] -> 0[0] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 5 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005198
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 6 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005210
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 7 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005288
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 02/0 : 3[3] -> 1[1] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 8 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005300
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 06/0 : 3[3] -> 1[1] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 9 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005378
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 10 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa8940053f0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 11 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005468
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 12 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa8940054e0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 13 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005558
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 01/0 : 3[3] -> 2[2] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 14 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa8940055d0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 05/0 : 3[3] -> 2[2] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 15 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005648
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected all rings
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 16 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa8940056c0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 17 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005738
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 18 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa8940057b0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 19 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005828
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 20 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa8940058a0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy recv connection 21 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005918
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 01/0 : 3[3] -> 0[0] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 22 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005990
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 02/0 : 3[3] -> 0[0] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 23 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005a08
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 05/0 : 3[3] -> 0[0] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 24 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005a80
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 06/0 : 3[3] -> 0[0] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 25 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005af8
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 03/0 : 3[3] -> 1[1] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 26 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005b70
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 07/0 : 3[3] -> 1[1] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 27 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005be8
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 00/0 : 3[3] -> 2[2] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 28 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005c60
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 02/0 : 3[3] -> 2[2] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 29 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005cd8
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 03/0 : 3[3] -> 2[2] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 30 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005d50
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 04/0 : 3[3] -> 2[2] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 31 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005dc8
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 06/0 : 3[3] -> 2[2] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 32 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005e40
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 07/0 : 3[3] -> 2[2] via P2P/IPC
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 33 from local rank 3, transport 0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005eb8
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected all trees
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO threadThresholds 8/8/64 | 32/8/64 | 512 | 512
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO 8 coll channels, 8 collnet channels, 0 nvls channels, 8 p2p channels, 2 p2p channels per peer
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2482848 [3] NCCL INFO New proxy send connection 34 from local rank 3, transport 2
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Connected to proxy localRank 3 -> connection 0x7fa894005f30
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO TUNER/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-tuner.so
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO TUNER/Plugin: Using internal tuner plugin.
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO ncclCommInitRank comm 0xe463030 rank 3 nranks 4 cudaDev 3 nvmlDev 3 busId 3b000 commId 0x2dbd318c6ddd186c - Init COMPLETE
+INFO 08-17 21:25:57 [shm_broadcast.py:266] vLLM message queue communication handle: Handle(local_reader_ranks=[1, 2, 3], buffer_handle=(3, 4194304, 6, 'psm_7f172d3d'), local_subscribe_addr='ipc:///tmp/bf5d1f67-312f-4c24-a006-9768066b8845', remote_subscribe_addr=None, remote_addr_ipv6=False)
+[VLLM_GLOO_RANK_RANGE] rank=0/8 range=50400-50424
+[GLOO_PORT_RANGE] pid=2481912 bound listener port=50402 range=50400-50424
+INFO 08-17 21:25:57 [utils.py:1045] Found nccl from environment variable VLLM_NCCL_SO_PATH=/home/u001013/llm_serving/build/torch-gloo-port/pytorch/build/nccl/lib/libnccl.so.2.21.5
+INFO 08-17 21:25:57 [pynccl.py:69] vLLM is using nccl==2.21.5
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50613
+gpunode1:2481912:2481912 [0] NCCL INFO Using non-device net plugin version 0
+gpunode1:2481912:2481912 [0] NCCL INFO Using network Socket
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50617
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50618
+gpunode1:2481912:2481912 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50614
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Channel 00/08 :    0   1   2   3
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Channel 01/08 :    0   3   2   1
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Channel 02/08 :    0   3   1   2
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Channel 03/08 :    0   2   1   3
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Channel 04/08 :    0   1   2   3
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Channel 05/08 :    0   3   2   1
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Channel 06/08 :    0   3   1   2
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m gpunode3:1819365:1819365 [0] NCCL INFO Channel 07/08 :    0   2   1   3
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m INFO 08-17 21:25:57 [shm_broadcast.py:266] vLLM message queue communication handle: Handle(local_reader_ranks=[1, 2, 3], buffer_handle=(3, 4194304, 6, 'psm_24b7d362'), local_subscribe_addr='ipc:///tmp/39dd1fef-4c21-4389-bb49-eaeb290bfdd7', remote_subscribe_addr=None, remote_addr_ipv6=False)
+gpunode1:2481912:2481912 [0] NCCL INFO ncclCommInitRank comm 0x178f99b0 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 15000 commId 0xa058b8f68c101500 - Init START
+gpunode1:2481912:2481912 [0] NCCL INFO NET/Socket : GPU Direct RDMA Disabled for HCA 0 'ens11f0'
+gpunode1:2481912:2481912 [0] NCCL INFO Setting affinity for GPU 0 to ff
+gpunode1:2481912:2481912 [0] NCCL INFO comm 0x178f99b0 rank 0 nRanks 2 nNodes 2 localRanks 1 localRank 0 MNNVL 0
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 00/02 :    0   1
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 01/02 :    0   1
+gpunode1:2481912:2481912 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] -1/-1/-1->0->1
+gpunode1:2481912:2481912 [0] NCCL INFO P2P Chunksize set to 131072
+gpunode1:2481912:2482894 [0] NCCL INFO New proxy recv connection 0 from local rank 0, transport 2
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f5634004f50
+gpunode1:2481912:2482894 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50627
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 00/0 : 1[0] -> 0[0] [receive] via NET/Socket/0
+gpunode1:2481912:2482894 [0] NCCL INFO New proxy recv connection 1 from local rank 0, transport 2
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f5634004fc8
+gpunode1:2481912:2482894 [0] NCCL INFO NCCL_PORT_RANGE bound listener to port 50630
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 01/0 : 1[0] -> 0[0] [receive] via NET/Socket/0
+gpunode1:2481912:2482894 [0] NCCL INFO New proxy send connection 2 from local rank 0, transport 2
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f5634005040
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[0] [send] via NET/Socket/0
+gpunode1:2481912:2482894 [0] NCCL INFO New proxy send connection 3 from local rank 0, transport 2
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f56340050b8
+gpunode1:2481912:2481912 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[0] [send] via NET/Socket/0
+gpunode1:2481912:2481912 [0] NCCL INFO Connected all rings
+gpunode1:2481912:2481912 [0] NCCL INFO Connected all trees
+gpunode1:2481912:2481912 [0] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512
+gpunode1:2481912:2481912 [0] NCCL INFO 2 coll channels, 2 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+gpunode1:2481912:2482894 [0] NCCL INFO New proxy send connection 4 from local rank 0, transport 2
+gpunode1:2481912:2481912 [0] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f5634005130
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 00/0 : 1[3] -> 0[3] [receive] via NET/Socket/0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 01/0 : 1[3] -> 0[3] [receive] via NET/Socket/0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 00/0 : 0[3] -> 1[3] [send] via NET/Socket/0
+[36m(RayWorkerWrapper pid=2480505)[0m gpunode1:2480505:2480505 [3] NCCL INFO Channel 01/0 : 0[3] -> 1[3] [send] via NET/Socket/0
+gpunode1:2481912:2481912 [0] NCCL INFO ncclCommInitRank comm 0x178f99b0 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 15000 commId 0xa058b8f68c101500 - Init COMPLETE
+[VLLM_GLOO_RANK_RANGE] rank=0/8 range=50400-50424
+[GLOO_PORT_RANGE] pid=2481912 bound listener port=50403 range=50400-50424
+INFO 08-17 21:25:57 [parallel_state.py:1051] rank 0 in world size 8 is assigned as DP rank 0, PP rank 0, TP rank 0
+INFO 08-17 21:25:57 [model_runner.py:1108] Starting to load model /home/u001013/.cache/llm-serving/huggingface/hub/models--Qwen--Qwen3-235B-A22B-GPTQ-Int4/snapshots/dff138951f3898772fc0d795a4b5b30f417577f4...
+WARNING 08-17 21:25:57 [utils.py:168] The model class Qwen3MoeForCausalLM has not defined `packed_modules_mapping`, this may lead to incorrect mapping of quantized or ignored modules
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m INFO 08-17 21:25:57 [parallel_state.py:1051] rank 4 in world size 8 is assigned as DP rank 0, PP rank 1, TP rank 0
+[36m(RayWorkerWrapper pid=1819365, ip=10.1.1.236)[0m INFO 08-17 21:25:57 [model_runner.py:1108] Starting to load model /home/u001013/.cache/llm-serving/huggingface/hub/models--Qwen--Qwen3-235B-A22B-GPTQ-Int4/snapshots/dff138951f3898772fc0d795a4b5b30f417577f4...
+[36m(RayWorkerWrapper pid=2480505)[0m WARNING 08-17 21:25:57 [utils.py:168] The model class Qwen3MoeForCausalLM has not defined `packed_modules_mapping`, this may lead to incorrect mapping of quantized or ignored modules
+ERROR 08-17 21:25:57 [worker_base.py:620] Error executing method 'load_model'. This might cause deadlock in distributed execution.
+ERROR 08-17 21:25:57 [worker_base.py:620] Traceback (most recent call last):
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/worker_base.py", line 612, in execute_method
+ERROR 08-17 21:25:57 [worker_base.py:620]     return run_method(self, method, args, kwargs)
+ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/utils.py", line 2456, in run_method
+ERROR 08-17 21:25:57 [worker_base.py:620]     return func(*args, **kwargs)
+ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/worker.py", line 203, in load_model
+ERROR 08-17 21:25:57 [worker_base.py:620]     self.model_runner.load_model()
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/model_runner.py", line 1111, in load_model
+ERROR 08-17 21:25:57 [worker_base.py:620]     self.model = get_model(vllm_config=self.vllm_config)
+ERROR 08-17 21:25:57 [worker_base.py:620]                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/__init__.py", line 14, in get_model
+ERROR 08-17 21:25:57 [worker_base.py:620]     return loader.load_model(vllm_config=vllm_config)
+ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/loader.py", line 452, in load_model
+ERROR 08-17 21:25:57 [worker_base.py:620]     model = _initialize_model(vllm_config=vllm_config)
+ERROR 08-17 21:25:57 [worker_base.py:620]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/loader.py", line 133, in _initialize_model
+ERROR 08-17 21:25:57 [worker_base.py:620]     return model_class(vllm_config=vllm_config, prefix=prefix)
+ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 488, in __init__
+ERROR 08-17 21:25:57 [worker_base.py:620]     self.model = Qwen3MoeModel(vllm_config=vllm_config,
+ERROR 08-17 21:25:57 [worker_base.py:620]                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/compilation/decorators.py", line 151, in __init__
+ERROR 08-17 21:25:57 [worker_base.py:620]     old_init(self, vllm_config=vllm_config, prefix=prefix, **kwargs)
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 334, in __init__
+ERROR 08-17 21:25:57 [worker_base.py:620]     self.start_layer, self.end_layer, self.layers = make_layers(
+ERROR 08-17 21:25:57 [worker_base.py:620]                                                     ^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/utils.py", line 610, in make_layers
+ERROR 08-17 21:25:57 [worker_base.py:620]     maybe_offload_to_cpu(layer_fn(prefix=f"{prefix}.{idx}"))
+ERROR 08-17 21:25:57 [worker_base.py:620]                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 336, in <lambda>
+ERROR 08-17 21:25:57 [worker_base.py:620]     lambda prefix: Qwen3MoeDecoderLayer(config=config,
+ERROR 08-17 21:25:57 [worker_base.py:620]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 278, in __init__
+ERROR 08-17 21:25:57 [worker_base.py:620]     self.mlp = Qwen3MoeSparseMoeBlock(config=config,
+ERROR 08-17 21:25:57 [worker_base.py:620]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 113, in __init__
+ERROR 08-17 21:25:57 [worker_base.py:620]     self.experts = FusedMoE(num_experts=config.num_experts,
+ERROR 08-17 21:25:57 [worker_base.py:620]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/layer.py", line 499, in __init__
+ERROR 08-17 21:25:57 [worker_base.py:620]     assert self.quant_method is not None
+ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-17 21:25:57 [worker_base.py:620] AssertionError
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/usr/local/bin/vllm", line 8, in <module>
+[rank0]:     sys.exit(main())
+[rank0]:              ^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cli/main.py", line 53, in main
+[rank0]:     args.dispatch_function(args)
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cli/serve.py", line 27, in cmd
+[rank0]:     uvloop.run(run_server(args))
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/uvloop/__init__.py", line 109, in run
+[rank0]:     return __asyncio.run(
+[rank0]:            ^^^^^^^^^^^^^^
+[rank0]:   File "/usr/lib/python3.12/asyncio/runners.py", line 195, in run
+[rank0]:     return runner.run(main)
+[rank0]:            ^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+[rank0]:     return self._loop.run_until_complete(task)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/uvloop/__init__.py", line 61, in wrapper
+[rank0]:     return await main
+[rank0]:            ^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 1078, in run_server
+[rank0]:     async with build_async_engine_client(args) as engine_client:
+[rank0]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+[rank0]:     return await anext(self.gen)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 146, in build_async_engine_client
+[rank0]:     async with build_async_engine_client_from_engine_args(
+[rank0]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+[rank0]:     return await anext(self.gen)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 194, in build_async_engine_client_from_engine_args
+[rank0]:     engine_client = AsyncLLMEngine.from_vllm_config(
+[rank0]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/async_llm_engine.py", line 657, in from_vllm_config
+[rank0]:     return cls(
+[rank0]:            ^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/async_llm_engine.py", line 612, in __init__
+[rank0]:     self.engine = self._engine_class(*args, **kwargs)
+[rank0]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/async_llm_engine.py", line 267, in __init__
+[rank0]:     super().__init__(*args, **kwargs)
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/llm_engine.py", line 275, in __init__
+[rank0]:     self.model_executor = executor_class(vllm_config=vllm_config)
+[rank0]:                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/executor/executor_base.py", line 286, in __init__
+[rank0]:     super().__init__(*args, **kwargs)
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/executor/executor_base.py", line 52, in __init__
+[rank0]:     self._init_executor()
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/executor/ray_distributed_executor.py", line 114, in _init_executor
+[rank0]:     self._init_workers_ray(placement_group)
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/executor/ray_distributed_executor.py", line 396, in _init_workers_ray
+[rank0]:     self._run_workers("load_model",
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/executor/ray_distributed_executor.py", line 516, in _run_workers
+[rank0]:     self.driver_worker.execute_method(sent_method, *args, **kwargs)
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/worker_base.py", line 621, in execute_method
+[rank0]:     raise e
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/worker_base.py", line 612, in execute_method
+[rank0]:     return run_method(self, method, args, kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/utils.py", line 2456, in run_method
+[rank0]:     return func(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/worker.py", line 203, in load_model
+[rank0]:     self.model_runner.load_model()
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/model_runner.py", line 1111, in load_model
+[rank0]:     self.model = get_model(vllm_config=self.vllm_config)
+[rank0]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/__init__.py", line 14, in get_model
+[rank0]:     return loader.load_model(vllm_config=vllm_config)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/loader.py", line 452, in load_model
+[rank0]:     model = _initialize_model(vllm_config=vllm_config)
+[rank0]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/loader.py", line 133, in _initialize_model
+[rank0]:     return model_class(vllm_config=vllm_config, prefix=prefix)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 488, in __init__
+[rank0]:     self.model = Qwen3MoeModel(vllm_config=vllm_config,
+[rank0]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/compilation/decorators.py", line 151, in __init__
+[rank0]:     old_init(self, vllm_config=vllm_config, prefix=prefix, **kwargs)
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 334, in __init__
+[rank0]:     self.start_layer, self.end_layer, self.layers = make_layers(
+[rank0]:                                                     ^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/utils.py", line 610, in make_layers
+[rank0]:     maybe_offload_to_cpu(layer_fn(prefix=f"{prefix}.{idx}"))
+[rank0]:                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 336, in <lambda>
+[rank0]:     lambda prefix: Qwen3MoeDecoderLayer(config=config,
+[rank0]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 278, in __init__
+[rank0]:     self.mlp = Qwen3MoeSparseMoeBlock(config=config,
+[rank0]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 113, in __init__
+[rank0]:     self.experts = FusedMoE(num_experts=config.num_experts,
+[rank0]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/layer.py", line 499, in __init__
+[rank0]:     assert self.quant_method is not None
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]: AssertionError
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620] Error executing method 'load_model'. This might cause deadlock in distributed execution.
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620] Traceback (most recent call last):
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/worker_base.py", line 612, in execute_method
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     return run_method(self, method, args, kwargs)
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/utils.py", line 2456, in run_method
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     return func(*args, **kwargs)
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/worker.py", line 203, in load_model
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.model_runner.load_model()
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/model_runner.py", line 1111, in load_model
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.model = get_model(vllm_config=self.vllm_config)
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/__init__.py", line 14, in get_model
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     return loader.load_model(vllm_config=vllm_config)
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/loader.py", line 452, in load_model
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     model = _initialize_model(vllm_config=vllm_config)
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/loader.py", line 133, in _initialize_model
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     return model_class(vllm_config=vllm_config, prefix=prefix)
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 488, in __init__
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.model = Qwen3MoeModel(vllm_config=vllm_config,
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/compilation/decorators.py", line 151, in __init__
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     old_init(self, vllm_config=vllm_config, prefix=prefix, **kwargs)
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 334, in __init__
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.start_layer, self.end_layer, self.layers = make_layers(
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                                                     ^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/utils.py", line 610, in make_layers
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     maybe_offload_to_cpu(layer_fn(prefix=f"{prefix}.{idx}"))
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 336, in <lambda>
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     lambda prefix: Qwen3MoeDecoderLayer(config=config,
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 278, in __init__
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.mlp = Qwen3MoeSparseMoeBlock(config=config,
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 113, in __init__
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.experts = FusedMoE(num_experts=config.num_experts,
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/layer.py", line 499, in __init__
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     assert self.quant_method is not None
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[36m(RayWorkerWrapper pid=2480505)[0m ERROR 08-17 21:25:57 [worker_base.py:620] AssertionError
+[36m(RayWorkerWrapper pid=2480505)[0m INFO 08-17 21:25:54 [cuda.py:228] Using XFormers backend.[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m [VLLM_GLOO_RANK_RANGE] rank=2/8 range=50450-50474[32m [repeated 27x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m INFO 08-17 21:25:57 [utils.py:1045] Found nccl from environment variable VLLM_NCCL_SO_PATH=/home/u001013/llm_serving/build/torch-gloo-port/pytorch/build/nccl/lib/libnccl.so.2.21.5[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m INFO 08-17 21:25:57 [pynccl.py:69] vLLM is using nccl==2.21.5[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO cudaDriverVersion 13000[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO NCCL_SOCKET_FAMILY set by environment to AF_INET[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO NCCL_SOCKET_IFNAME set by environment to =ens11f0[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO NCCL_SOCKET_IFNAME set to =ens11f0[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO Bootstrap : Using ens11f0:10.1.1.236<0>[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO NET/Plugin: No plugin found (libnccl-net.so)[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO NET/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-net.so[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO NET/Plugin: Using internal network plugin.[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1820081 [3] NCCL INFO NCCL_PORT_RANGE bound listener to port 50626[32m [repeated 56x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m NCCL version 2.21.5+cuda12.4[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO NCCL_IB_DISABLE set by environment to 1.[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO NET/Socket : Using [0]ens11f0:10.1.1.238<0>[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO Using non-device net plugin version 0[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO Using network Socket[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO ncclCommInitRank comm 0x11c9a720 rank 0 nranks 2 cudaDev 2 nvmlDev 2 busId 3a000 commId 0xd646ea2b57ed6c00 - Init START[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO NET/Socket : GPU Direct RDMA Disabled for HCA 0 'ens11f0'[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO NCCL_CUMEM_ENABLE set by environment to 0.[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO Setting affinity for GPU 2 to ff[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO NVLS multicast support is not available on dev 3[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m gpunode3:1819364:1819364 [1] NCCL INFO comm 0x1186a9a0 rank 1 nRanks 2 nNodes 2 localRanks 1 localRank 0 MNNVL 0[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m gpunode3:1819364:1819364 [1] NCCL INFO Trees [0] -1/-1/-1->1->0 [1] 0/-1/-1->1->-1[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819364, ip=10.1.1.236)[0m gpunode3:1819364:1819364 [1] NCCL INFO P2P Chunksize set to 131072[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1820081 [3] NCCL INFO New proxy recv connection 1 from local rank 0, transport 2[32m [repeated 104x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO Connected to proxy localRank 0 -> connection 0x7f4174005120[32m [repeated 223x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO Channel 07/0 : 3[3] -> 2[2] via P2P/IPC[32m [repeated 92x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1820081 [3] NCCL INFO New proxy send connection 4 from local rank 0, transport 2[32m [repeated 119x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO Connected all rings[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO Connected all trees[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO 2 coll channels, 2 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO TUNER/Plugin: Plugin load returned 2 : libnccl-net.so: cannot open shared object file: No such file or directory : when loading libnccl-tuner.so[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO TUNER/Plugin: Using internal tuner plugin.[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO ncclCommInitRank comm 0x11c9a720 rank 0 nranks 2 cudaDev 2 nvmlDev 2 busId 3a000 commId 0xd646ea2b57ed6c00 - Init COMPLETE[32m [repeated 13x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m gpunode1:2480509:2480509 [2] NCCL INFO Channel 01/02 :    0   1[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO Channel 01/0 : 0[3] -> 1[3] [receive] via NET/Socket/0[32m [repeated 12x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m gpunode3:1819367:1819367 [3] NCCL INFO Channel 01/0 : 1[3] -> 0[3] [send] via NET/Socket/0[32m [repeated 12x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m INFO 08-17 21:25:57 [parallel_state.py:1051] rank 2 in world size 8 is assigned as DP rank 0, PP rank 0, TP rank 2[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m INFO 08-17 21:25:57 [model_runner.py:1108] Starting to load model /home/u001013/.cache/llm-serving/huggingface/hub/models--Qwen--Qwen3-235B-A22B-GPTQ-Int4/snapshots/dff138951f3898772fc0d795a4b5b30f417577f4...[32m [repeated 6x across cluster][0m
+[36m(RayWorkerWrapper pid=1819367, ip=10.1.1.236)[0m WARNING 08-17 21:25:57 [utils.py:168] The model class Qwen3MoeForCausalLM has not defined `packed_modules_mapping`, this may lead to incorrect mapping of quantized or ignored modules[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620] Error executing method 'load_model'. This might cause deadlock in distributed execution.[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620] Traceback (most recent call last):[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/worker_base.py", line 612, in execute_method[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     return run_method(self, method, args, kwargs)[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[32m [repeated 8x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/utils.py", line 2456, in run_method[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     return func(*args, **kwargs)[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/loader.py", line 452, in load_model[32m [repeated 12x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.model_runner.load_model()[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.model = get_model(vllm_config=self.vllm_config)[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/__init__.py", line 14, in get_model[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     return loader.load_model(vllm_config=vllm_config)[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[32m [repeated 8x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     model = _initialize_model(vllm_config=vllm_config)[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/loader.py", line 133, in _initialize_model[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     return model_class(vllm_config=vllm_config, prefix=prefix)[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/layer.py", line 499, in __init__[32m [repeated 24x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.model = Qwen3MoeModel(vllm_config=vllm_config,[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     old_init(self, vllm_config=vllm_config, prefix=prefix, **kwargs)[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.start_layer, self.end_layer, self.layers = make_layers([32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                                                     ^^^^^^^^^^^^[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/utils.py", line 610, in make_layers[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     maybe_offload_to_cpu(layer_fn(prefix=f"{prefix}.{idx}"))[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_moe.py", line 336, in <lambda>[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     lambda prefix: Qwen3MoeDecoderLayer(config=config,[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.mlp = Qwen3MoeSparseMoeBlock(config=config,[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     self.experts = FusedMoE(num_experts=config.num_experts,[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]     assert self.quant_method is not None[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m ERROR 08-17 21:25:57 [worker_base.py:620] AssertionError[32m [repeated 4x across cluster][0m
+[36m(RayWorkerWrapper pid=2480505)[0m WARNING[XFORMERS]: xFormers can't load C++/CUDA extensions. xFormers was built for:[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=2480505)[0m     PyTorch 2.6.0+cu124 with CUDA 1204 (you have 2.6.0+cu124)[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=2480505)[0m     Python  3.12.8 (you have 3.12.10)[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=2480505)[0m   Please reinstall xformers (see https://github.com/facebookresearch/xformers#installing-xformers)[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=2480505)[0m   Memory-efficient attention, SwiGLU, sparse and more won't be available.[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=2480505)[0m   Set XFORMERS_MORE_DETAILS=1 for more details[32m [repeated 3x across cluster][0m
+[36m(RayWorkerWrapper pid=2480509)[0m [GLOO_PORT_RANGE] pid=2480509 bound listener port=50453 range=50450-50474[32m [repeated 27x across cluster][0m
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked shared_memory objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+[rank0]:[W817 21:25:58.687246204 ProcessGroupNCCL.cpp:1496] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())

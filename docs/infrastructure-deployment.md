@@ -4,107 +4,145 @@ This guide details how to build containers, download models, and deploy high-per
 
 ---
 
-## 1. Prerequisites & Environment
+## 1. HPC Deployment Workflow
 
-- **HPC Scheduler**: Slurm Workload Manager.
-- **Container Engine**: Apptainer / Singularity (unprivileged runtime with GPU support `--nv`).
-- **Hardware**: NVIDIA Volta V100 / Ampere A100 / Hopper H100 GPUs.
-- **Storage**: Fast shared scratch or NFS file system accessible across compute nodes.
+```mermaid
+flowchart TD
+    subgraph BuildPhase ["1. Build & Preparation (Login/Build Node)"]
+        DEF["defs/vllm.def"] --> BUILD["apptainer build build/vllm.sif"]
+        BUILD --> SIF["build/vllm.sif (Container Image)"]
+    end
+
+    subgraph DownloadPhase ["2. Model Download (Compute Node Batch Job)"]
+        DL_SCRIPT["slurm/download/hf_download_qwen9b_gguf.sbatch"]
+        DL_SCRIPT --> SCRATCH["$SCRATCH/models/qwen3.5-9b-gguf/<br/>Qwen3.5-9B-Q4_K_M.gguf (~5.8 GB)"]
+    end
+
+    subgraph ServingPhase ["3. Single-GPU Serving (Slurm Compute Node)"]
+        SBATCH["sbatch slurm/serving/vllm-singlegpu.sbatch"]
+        SBATCH --> SLURM_ALLOC["Slurm Resource Allocation<br/>1 GPU (V100) | 4 CPUs | 32GB RAM"]
+        SLURM_ALLOC --> RUN_CONTAINER["Apptainer Run (vllm.sif)<br/>VLLM_USE_V1=0 | --dtype float16"]
+        RUN_CONTAINER --> VLLM_PORT["vLLM Listening on 0.0.0.0:8000"]
+    end
+
+    subgraph TunnelPhase ["4. Local Access (Workstation)"]
+        TUNNEL_CMD["./scripts/ssh-tunnel.sh"]
+        TUNNEL_CMD --> LOCAL_PORT["127.0.0.1:18000 &rarr; compute_node:8000"]
+        LOCAL_PORT --> GATEWAY["FastAPI Gateway & vLLMlocal UI (Port 9000)"]
+    end
+
+    SIF --> RUN_CONTAINER
+    SCRATCH --> RUN_CONTAINER
+    VLLM_PORT --> TUNNEL_CMD
+```
 
 ---
 
-## 2. Building the Apptainer Container
+## 2. Prerequisites & Environment
 
-Build the vLLM container image from the definition file on a build node or login node with Apptainer access:
+- **HPC Workload Scheduler**: Slurm Workload Manager.
+- **Container Runtime**: Apptainer / Singularity (unprivileged runtime with GPU support `--nv`).
+- **Target Hardware**: NVIDIA Tesla V100 (Volta SM70, 16GB / 32GB VRAM).
+- **Filesystem**: Shared scratch or NFS filesystem accessible across cluster compute nodes.
+
+---
+
+## 3. Building the Apptainer Container
+
+Build the vLLM container image from the definition file on a build or login node:
 
 ```bash
-cd infrastructure_layer
+cd infra
 mkdir -p build
 
 apptainer build build/vllm.sif defs/vllm.def
 ```
 
-*Note: The definition file `defs/vllm.def` builds upon `vllm/vllm-openai:v0.8.5.post1` and configures environment variables suited for NVIDIA Volta V100 (`VLLM_USE_V1=0`, `NVIDIA_TF32_OVERRIDE=0`, `dtype float16`).*
+*Note: The definition file `defs/vllm.def` builds upon `vllm/vllm-openai:v0.8.5.post1` and sets optimal flags for Volta V100 hardware (`VLLM_USE_V1=0`, `NVIDIA_TF32_OVERRIDE=0`, `--dtype float16`).*
 
 ---
 
-## 3. Downloading Hugging Face Models
+## 4. Downloading Quantized GGUF Models
 
-To prevent holding GPU allocations idle while downloading massive weights, use compute-node download scripts:
-
-```bash
-cd infrastructure_layer
-
-# Submit job to download Qwen2.5-32B-Instruct
-sbatch slurm/download/hf_download_qwen32b.sbatch
-
-# Submit job to download Qwen3-235B (GPTQ INT4)
-sbatch slurm/download/hf_download_qwen235b.sbatch
-```
-
-To verify or repair model snapshot integrity:
+To avoid occupying expensive GPU node allocations during downloads, submit a dedicated batch download job:
 
 ```bash
-sbatch slurm/download/hf_verify_repair_qwen32b.sbatch
+cd infra
+
+# Submit job to download Qwen 3.5 9B GGUF (Q4_K_M)
+sbatch slurm/download/hf_download_qwen9b_gguf.sbatch
 ```
+
+The script downloads the quantized GGUF weights directly to `$SCRATCH/models/qwen3.5-9b-gguf/` and automatically verifies file integrity.
 
 ---
 
-## 4. Submitting Slurm Inference Jobs
+## 5. Submitting Slurm Inference Jobs
 
-### 4.1 Single GPU / Single Node
-For smaller models or development testing:
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / DevOps
+    participant Slurm as Slurm Scheduler (sbatch)
+    participant Node as Assigned Compute Node
+    participant Log as Log File (vllm-*.out)
 
-```bash
-sbatch infrastructure_layer/slurm/vllm-singlegpu-singlenode.sbatch
+    User->>Slurm: sbatch slurm/serving/vllm-singlegpu.sbatch
+    Slurm-->>User: Submitted batch job 491823
+    Slurm->>Node: Allocate 1x V100 GPU + 4 CPUs + 32GB RAM
+    Node->>Node: Launch Apptainer vllm.sif
+    Node->>Log: Writing startup logs & weight loading
+    Note over Node,Log: VRAM allocated: 5.8 GB (Model) + 9.5 GB (KV Cache)
+    Node->>Log: Uvicorn running on http://0.0.0.0:8000
+    User->>Log: tail -f infra/logs/vllm-*.out
+    User->>User: Identify node (e.g. gpunode1) & open SSH tunnel
 ```
 
-### 4.2 Multi-GPU Single Node (Tensor Parallelism TP=4)
-For models such as `Qwen/Qwen2.5-32B-Instruct` requiring multiple GPUs on 1 node:
-
-```bash
-sbatch infrastructure_layer/slurm/vllm-multigpu-singlenode.sbatch
-```
-
-Job specifications:
-- **GPUs**: 4 GPUs (`--gres=gpu:4`)
-- **CPUs**: 16 cores (`--cpus-per-task=16`)
-- **RAM**: 128 GB
-- **Tensor Parallelism**: `TP=4`
-
-### 4.3 Multi-Node Deployment (Ray Cluster: TP=4, PP=2)
-For large-scale models (e.g. `Qwen/Qwen3-235B-A22B-GPTQ-Int4` across 2 nodes x 4 GPUs = 8 GPUs total):
-
-```bash
-sbatch infrastructure_layer/slurm/multi_node_deploy.sbatch
-```
-
-How Multi-Node Deployment Works:
-1. Slurm allocates 2 compute nodes.
-2. Script resolves Head node and Worker node IP addresses.
-3. Launches a Ray head cluster on Node 0 and connects Node 1 as a Ray worker node.
-4. Polls Ray cluster readiness (`NODES=2 GPUS=8`).
-5. Launches `vllm serve` with `--distributed-executor-backend ray --tensor-parallel-size 4 --pipeline-parallel-size 2`.
+### Job Specifications:
+- **GPU Allocation**: 1 GPU (`#SBATCH --gres=gpu:1`)
+- **CPU Cores**: 4 Cores (`#SBATCH --cpus-per-task=4`)
+- **Memory**: 32 GB RAM (`#SBATCH --mem=32G`)
+- **Target Model**: `Qwen3.5-9B-Q4_K_M.gguf`
+- **Engine Flags**: `VLLM_USE_V1=0`, `--dtype float16`, `--max-model-len 8192`, `--gpu-memory-utilization 0.90`
+- **Serving Port**: `8000` on the allocated compute node.
 
 ---
 
-## 5. Monitoring & Troubleshooting
+## 6. Monitoring & SSH Tunneling
 
-Check running jobs and locate compute node names:
-
+### 6.1 Check Active Slurm Jobs
 ```bash
 squeue -u $USER
 ```
+Identify the assigned node name (e.g., `gpunode1.gitc.hpc`).
 
-Inspect Slurm logs:
-
+### 6.2 Monitor Real-Time vLLM Server Output
 ```bash
-tail -f infrastructure_layer/logs/vllm-*.out
-tail -f infrastructure_layer/logs/vllm-*.err
+tail -f infra/logs/vllm-*.out
+```
+Wait until the log reports:
+```
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ```
 
-Test endpoint directly on compute node:
+### 6.3 Establish SSH Tunnel to Local Gateway
+From your local machine / gateway host, forward port `18000` to port `8000` on the compute node:
 
 ```bash
-ssh <compute-node-name> 'curl http://127.0.0.1:8000/v1/models'
+cd app
+GPU_NODE=gpunode1.gitc.hpc LOCAL_PORT=18000 ./scripts/ssh-tunnel.sh
 ```
+
+---
+
+## 7. Starting Gateway & Web Dashboard
+
+Launch the FastAPI Gateway on your local machine:
+
+```bash
+cd app
+./scripts/run.sh
+```
+
+Access the unified **vLLMlocal** dashboard at `http://127.0.0.1:9000/`.

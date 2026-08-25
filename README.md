@@ -1,4 +1,4 @@
-# Local HPC LLM Architecture & Serving Framework
+# V100-local — NVIDIA Tesla V100 HPC LLM Architecture & Serving Platform
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
 [![vLLM](https://img.shields.io/badge/vLLM-v0.8.5+-blue.svg)](https://github.com/vllm-project/vllm)
@@ -6,49 +6,74 @@
 [![Slurm](https://img.shields.io/badge/Slurm-Workload_Manager-orange.svg)](https://slurm.schedmd.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-An end-to-end local Large Language Model (LLM) serving stack designed for high-performance computing (HPC) environments equipped with GPU clusters (NVIDIA V100/A100/H100) and Slurm workload management. 
-
-This repository provides a multi-layer solution:
-1. **Infrastructure Layer**: Containerized vLLM engine, automated Hugging Face model downloads, single/multi-GPU Tensor Parallelism (TP=4), and multi-node Ray cluster orchestration (TP=4, PP=2).
-2. **Application Layer**: An OpenAI-compatible FastAPI Gateway proxy with a built-in Web UI dashboard, API key authentication (`sk-hpc-...`), SHA-256 hashed SQLite database storage, Model ACLs, and sliding window rate limiting.
+An enterprise-grade, full-stack local Large Language Model (LLM) serving and governance platform designed for High-Performance Computing (HPC) environments running GPU clusters (NVIDIA Volta V100, Ampere A100, Hopper H100) managed by Slurm.
 
 ---
 
-## 🏗️ Architecture Overview
+## 🏗️ Multi-Layer System Architecture
 
-```text
-+-------------------------------------------------------------------------------+
-|                                CLIENT LAYER                                   |
-|   Python SDK (openai)    |    cURL / REST Clients    |    Web UI Dashboard    |
-+---------------------------------------+---------------------------------------+
-                                        | (HTTP http://127.0.0.1:9000/v1)
-                                        v
-+-------------------------------------------------------------------------------+
-|                          APPLICATION LAYER (GATEWAY)                          |
-|  FastAPI OpenAI Proxy  -  API Key ACL & Hash Storage  -  RPM Rate Limiting    |
-+---------------------------------------+---------------------------------------+
-                                        | (SSH Tunnel 127.0.0.1:18000 -> Node:8000)
-                                        v
-+-------------------------------------------------------------------------------+
-|                           INFRASTRUCTURE LAYER (HPC)                          |
-|  Slurm Jobs  -  Apptainer Container (vllm.sif)  -  Ray Distributed Engine     |
-|  GPUs: NVIDIA V100/A100/H100  |  Models: Qwen2.5-32B, Qwen3-235B (TP4, PP2)   |
-+-------------------------------------------------------------------------------+
+```mermaid
+flowchart TB
+    subgraph ClientLayer ["Client Layer"]
+        SDK["Python SDK (openai)"]
+        REST["cURL / REST Clients"]
+        WEB["V100-local Web Dashboard"]
+    end
+
+    subgraph AppLayer ["Application Layer (FastAPI Gateway @ Port 9000)"]
+        PROXY["OpenAI Reverse Proxy (/v1)"]
+        AUTH["Admin Session Auth & API Key ACL"]
+        METRICS["Real-Time Token Telemetry & Speedometer"]
+        DB[("SQLite Database (gateway.db)")]
+        
+        PROXY --- AUTH
+        PROXY --- METRICS
+        AUTH --- DB
+        METRICS --- DB
+    end
+
+    subgraph TunnelLayer ["Networking Layer"]
+        SSH["SSH Local Port Forwarding Tunnel<br/>127.0.0.1:18000 &rarr; compute_node:8000"]
+    end
+
+    subgraph InfraLayer ["Infrastructure Layer (HPC Slurm Cluster)"]
+        SLURM["Slurm Workload Manager (vllm-singlegpu.sbatch)"]
+        CONTAINER["Apptainer Container (vllm.sif with VLLM_USE_V1=0)"]
+        VLLM["vLLM Serving Engine (Single GPU, TP=1)"]
+        MODEL["Qwen 3.5 9B Quantized GGUF (FP16)"]
+        GPU["1x NVIDIA Tesla V100 GPU (16GB VRAM)"]
+
+        SLURM --> CONTAINER --> VLLM --> MODEL --> GPU
+    end
+
+    ClientLayer -->|"HTTP (Authorization: Bearer sk-hpc-...)"| PROXY
+    PROXY -->|"HTTP Forwarding"| SSH
+    SSH -->|"TCP / Port 8000"| VLLM
 ```
 
-Detailed architectural documentation is available in [docs/architecture.md](file:///home/phucnhan/codespace/hpc/local-llm/docs/architecture.md).
-
 ---
 
-## ✨ Features
+## ✨ Key Capabilities
 
-- **HPC Cluster Optimization**: Pre-configured for Slurm job submission with isolated Apptainer/Singularity container profiles (`defs/vllm.def`).
-- **Distributed Inference**: Support for single-GPU, multi-GPU Tensor Parallelism (`TP=4`), and multi-node Ray pipeline execution (`TP=4, PP=2`).
-- **Zero-Downtime Model Caching**: Standalone sbatch download jobs with hash verification and auto-repair (`slurm/download/`).
-- **OpenAI-Compatible Gateway**: Serve standard `/v1/chat/completions`, `/v1/completions`, and `/v1/models` endpoints.
-- **Secure Key Management**: Issue `sk-hpc-...` API keys stored as SHA-256 hashes in SQLite.
-- **Access Control & Rate Limiting**: Model-level ACL per key and customizable Requests-Per-Minute (RPM) enforcement.
-- **Web UI Dashboard**: Administrative dashboard for generating keys, tracking metrics, and revoking tokens.
+1. **High-Throughput HPC Serving**:
+   - Optimized for single-GPU Volta V100 compute nodes using quantized GGUF weights (`Qwen3.5-9B-Q4_K_M.gguf`) occupying only **~5.8 GB VRAM**, leaving **64% VRAM headroom** for ultra-long context KV Caching.
+   - Pinned Apptainer container runtime (`vllm.sif`) running without root privileges.
+
+2. **Full Observability & Token Dynamics**:
+   - **Real-Time Speedometer**: Measures continuous token generation speed (`tok/s`), Time To First Token (`TTFT`), and end-to-end request latency.
+   - **Interactive Chart.js Dashboard**: Dual-axis bar and line charts visualizing tokens generated per minute alongside cumulative token volume.
+   - **Inference Audit Ledger**: Complete transaction history recording tokens, latency, status, and client keys.
+
+3. **Slurm Cluster Job Supervision**:
+   - Live cluster status polling displaying job IDs, compute nodes, partition state, and execution time directly on the web interface.
+
+4. **AI Chatbot Studio**:
+   - Multi-turn conversational playground with persistent dialogue history.
+   - Enhanced Markdown rendering with code syntax highlighting (Atom One Dark theme) and 1-click code block copying.
+
+5. **Security & API Key Governance**:
+   - **Admin Authentication**: Secure login system with username/password issuing 7-day session tokens (`sess_...`).
+   - **Client API Keys**: Issues hashed `sk-hpc-...` tokens with custom Sliding Window Rate Limiting (RPM) and Model Access Control Lists (ACL).
 
 ---
 
@@ -56,117 +81,74 @@ Detailed architectural documentation is available in [docs/architecture.md](file
 
 ```text
 local-llm/
-├── .gitignore                          # Ignored secrets, databases, caches & logs
-├── README.md                           # Root documentation & getting started
-├── docs/                               # Detailed system documentation
+├── .env.example                        # Global environment configuration template
+├── GUIDE.md                            # Comprehensive HPC deployment guide
+├── README.md                           # Project overview & quickstart
+├── docs/                               # Comprehensive technical documentation
+│   ├── api-descriptions.md             # REST API endpoint specifications
 │   ├── api-gateway.md                  # Application gateway & dashboard guide
-│   ├── architecture.md                 # Technical architecture & request flows
-│   └── infrastructure-deployment.md    # HPC, Slurm, Ray & Apptainer guide
-├── application_layer/                  # Application Layer Gateway Proxy
-│   └── onenode/                        # Single-gateway service deployment
-│       ├── app/                        # FastAPI application source code
-│       │   ├── __init__.py
-│       │   └── main.py                 # Core proxy server, key management & Web UI
-│       ├── config/                     # Model routing configuration
-│       │   └── models.json
-│       ├── examples/                   # Usage code snippets
-│       │   ├── curl.sh
-│       │   └── python_client.py
-│       ├── scripts/                    # Deployment & helper scripts
-│       │   ├── run.sh                  # Virtualenv setup & gateway launcher
-│       │   └── ssh-tunnel.sh           # Local SSH port forwarding to HPC node
-│       ├── .env.example                # Template configuration file
-│       ├── README.md                   # Application layer detailed readme
-│       └── requirements.txt            # Python dependencies
-└── infrastructure_layer/               # Infrastructure Layer (HPC / Slurm)
-    ├── build/                          # Apptainer build directory & notes
-    ├── defs/                           # Container definition files
-    │   └── vllm.def                    # Apptainer vLLM profile for NVIDIA GPUs
-    ├── logs/                           # Slurm execution logs (.out / .err)
+│   ├── architecture.md                 # System architecture & data flow diagrams
+│   └── infrastructure-deployment.md    # HPC, Slurm & Apptainer deployment guide
+├── app/                                # Application Gateway & Web App
+│   ├── app/                            # FastAPI backend
+│   │   ├── __init__.py
+│   │   └── main.py                     # Proxy server, metrics collector & auth
+│   ├── config/                         # Upstream model routing config
+│   │   └── models.json
+│   ├── ui/                             # Frontend single-page application
+│   │   └── index.html                  # vLLMlocal UI (HTML, Tailwind, Marked, Chart.js)
+│   ├── data/                           # Local SQLite database (gateway.db)
+│   ├── examples/                       # Python SDK & cURL usage scripts
+│   ├── scripts/                        # Launcher & SSH tunnel scripts
+│   │   ├── run.sh                      # Gateway launcher
+│   │   └── ssh-tunnel.sh               # Port forward helper
+│   ├── .env.example                    # Local environment template
+│   └── requirements.txt                # Python dependencies
+└── infra/                              # HPC Infrastructure & Slurm
+    ├── build/                          # Container build directory
+    ├── defs/                           # Apptainer definition files (vllm.def)
+    ├── logs/                           # Slurm stdout and stderr logs
     └── slurm/                          # Slurm batch submission scripts
-        ├── download/                   # HF model download & repair jobs
-        │   ├── hf_download_qwen235b.sbatch
-        │   ├── hf_download_qwen32b.sbatch
-        │   └── hf_verify_repair_qwen32b.sbatch
-        ├── multi_node_deploy.sbatch    # 2-node 8-GPU Ray + vLLM deployment
-        ├── vllm-multigpu-singlenode.sbatch # 4-GPU single-node TP4 deployment
-        └── vllm-singlegpu-singlenode.sbatch # Single GPU single-node deployment
+        ├── serving/                    # Model serving jobs (vllm-singlegpu.sbatch)
+        └── download/                   # Model download jobs (hf_download_qwen9b_gguf.sbatch)
 ```
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Quick Start
 
-### 1. Build Container & Download Model (HPC Cluster)
-On the HPC login/build node:
-
+### 1. Launch vLLM on HPC Compute Node
 ```bash
-cd infrastructure_layer
-
-# Build Apptainer container
-apptainer build build/vllm.sif defs/vllm.def
-
-# Submit model download job
-sbatch slurm/download/hf_download_qwen32b.sbatch
+cd infra
+sbatch slurm/serving/vllm-singlegpu.sbatch
+```
+Check job node assignment:
+```bash
+squeue -u $USER
 ```
 
-### 2. Launch Inference Server (Slurm)
-Submit a Slurm job to start the vLLM engine:
-
+### 2. Forward Compute Node Port to Local Machine
 ```bash
-# 4-GPU Single Node (Qwen2.5-32B)
-sbatch infrastructure_layer/slurm/vllm-multigpu-singlenode.sbatch
+cd app
+GPU_NODE=gpunode1.gitc.hpc LOCAL_PORT=18000 ./scripts/ssh-tunnel.sh
 ```
 
-### 3. Open SSH Tunnel & Launch Gateway (Local Machine)
-Connect your local environment to the active Slurm compute node:
-
+### 3. Configure Environment & Start Gateway
 ```bash
-# Terminal 1: Open SSH Tunnel
-cd application_layer/onenode
-GPU_NODE=gpunode1.gitc.hpc ./scripts/ssh-tunnel.sh
+# Copy template at root or inside app/
+cp .env.example .env
 
-# Terminal 2: Start Gateway Proxy API
-cd application_layer/onenode
+# Launch Gateway server & Web console
+cd app
 ./scripts/run.sh
 ```
-
-### 4. Create API Key & Send Request
-1. Open `http://127.0.0.1:9000/` in your browser.
-2. Enter the `ADMIN_TOKEN` found in `application_layer/onenode/.env`.
-3. Generate a new API key (e.g. `sk-hpc-samplekey...`).
-4. Execute requests using OpenAI Python SDK or cURL:
-
-```python
-import openai
-
-client = openai.OpenAI(
-    base_url="http://127.0.0.1:9000/v1",
-    api_key="sk-hpc-YOUR_KEY"
-)
-
-response = client.chat.completions.create(
-    model="qwen2.5-32b",
-    messages=[{"role": "user", "content": "Hello vLLM on HPC!"}],
-    stream=True
-)
-
-for chunk in response:
-    print(chunk.choices[0].delta.content or "", end="")
-```
+Open **`http://127.0.0.1:9000`** in your browser to access the **vLLMlocal** console.
 
 ---
 
 ## 📚 Documentation Index
 
-- [Architecture & System Design](file:///home/phucnhan/codespace/hpc/local-llm/docs/architecture.md)
-- [Infrastructure & Slurm Deployment Guide](file:///home/phucnhan/codespace/hpc/local-llm/docs/infrastructure-deployment.md)
-- [API Gateway & Dashboard Guide](file:///home/phucnhan/codespace/hpc/local-llm/docs/api-gateway.md)
-
----
-
-## 🔐 Security & Data Hygiene
-
-- `.env` files contain sensitive tokens and secrets and are ignored by `.gitignore`.
-- SQLite database files (`gateway.db`) store only hashed key representations.
-- Model cache directories and container images (`*.sif`) are excluded from version control.
+- [REST API Specifications](file:///d:/Projects/local-llm/docs/api-descriptions.md)
+- [Gateway & Dashboard User Guide](file:///d:/Projects/local-llm/docs/api-gateway.md)
+- [Architecture & Technical Design](file:///d:/Projects/local-llm/docs/architecture.md)
+- [HPC Infrastructure & Slurm Guide](file:///d:/Projects/local-llm/docs/infrastructure-deployment.md)

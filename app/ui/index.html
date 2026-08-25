@@ -1,0 +1,3092 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#F5F7FA] dark:bg-[#0b1120] text-slate-900 dark:text-slate-100">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V100-local | NVIDIA Tesla V100 Inference & Chat Gateway</title>
+    <!-- Theme bootstrap script to prevent FOUC -->
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('hpc_theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Marked.js for full Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Highlight.js for Syntax Highlighting -->
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Chart.js CDN for Real-time Token Generation Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Font: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Inter"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        qpay: {
+                            blue: '#00457C',       // Deep HPC Blue
+                            action: '#0079C1',     // Active Accent Blue
+                            light: '#F0F5FA',
+                            accent: '#002C6C',
+                            border: '#D1E0EE'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            font-feature-settings: 'tnum' 1, 'cv02' 1, 'cv03' 1, 'cv04' 1;
+            border-radius: 0px !important;
+        }
+
+        .font-code {
+            font-family: 'JetBrains Mono', monospace !important;
+        }
+
+        /* Enhanced Markdown Body Typography */
+        .markdown-body {
+            font-size: 0.8125rem;
+            line-height: 1.65;
+            color: #1e293b;
+        }
+
+        .dark .markdown-body {
+            color: #cbd5e1;
+        }
+
+        .markdown-body h1,
+        .markdown-body h2,
+        .markdown-body h3,
+        .markdown-body h4 {
+            font-weight: 700;
+            color: #0f172a;
+            margin-top: 0.75rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .dark .markdown-body h1,
+        .dark .markdown-body h2,
+        .dark .markdown-body h3,
+        .dark .markdown-body h4 {
+            color: #f8fafc;
+        }
+
+        .markdown-body h1 {
+            font-size: 1.1rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.25rem;
+        }
+
+        .dark .markdown-body h1 {
+            border-bottom-color: #334155;
+        }
+
+        .markdown-body h2 {
+            font-size: 1.0rem;
+        }
+
+        .markdown-body h3 {
+            font-size: 0.9rem;
+        }
+
+        .markdown-body p {
+            margin-bottom: 0.6rem;
+        }
+
+        .markdown-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        .markdown-body ul,
+        .markdown-body ol {
+            margin-left: 1.25rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .markdown-body ul {
+            list-style-type: disc;
+        }
+
+        .markdown-body ol {
+            list-style-type: decimal;
+        }
+
+        .markdown-body li {
+            margin-bottom: 0.2rem;
+        }
+
+        .markdown-body blockquote {
+            border-left: 3px solid #00457C;
+            padding-left: 0.75rem;
+            color: #475569;
+            background: #f8fafc;
+            margin: 0.6rem 0;
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+        }
+
+        .dark .markdown-body blockquote {
+            border-left-color: #0079C1;
+            color: #94a3b8;
+            background: #1e293b;
+        }
+
+        .markdown-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.6rem 0;
+            font-size: 0.75rem;
+        }
+
+        .markdown-body th,
+        .markdown-body td {
+            border: 1px solid #cbd5e1;
+            padding: 0.35rem 0.55rem;
+            text-align: left;
+        }
+
+        .dark .markdown-body th,
+        .dark .markdown-body td {
+            border-color: #334155;
+        }
+
+        .markdown-body th {
+            background-color: #f1f5f9;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .dark .markdown-body th {
+            background-color: #1e293b;
+            color: #f8fafc;
+        }
+
+        .markdown-body hr {
+            border: 0;
+            border-top: 1px solid #e2e8f0;
+            margin: 0.75rem 0;
+        }
+
+        .dark .markdown-body hr {
+            border-top-color: #334155;
+        }
+
+        .markdown-body strong {
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .dark .markdown-body strong {
+            color: #f8fafc;
+        }
+
+        .markdown-body p code,
+        .markdown-body li code {
+            background: #e2e8f0;
+            color: #0f172a;
+            padding: 0.15rem 0.35rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 0.75rem;
+        }
+
+        .dark .markdown-body p code,
+        .dark .markdown-body li code {
+            background: #1e293b;
+            color: #38bdf8;
+        }
+
+        .code-wrapper {
+            margin: 0.6rem 0;
+            border: 1px solid #1e293b;
+            background: #0f172a;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.3rem 0.65rem;
+            background: #1e293b;
+            color: #94a3b8;
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .code-copy-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            color: #cbd5e1;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            padding: 0.15rem 0.35rem;
+            transition: color 0.15s;
+        }
+
+        .code-copy-btn:hover {
+            color: #38bdf8;
+        }
+
+        .markdown-body pre {
+            margin: 0;
+            padding: 0.75rem;
+            overflow-x: auto;
+            background: transparent;
+        }
+
+        .markdown-body pre code {
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 0.75rem;
+            padding: 0;
+            background: transparent;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #F5F7FA;
+        }
+
+        .dark ::-webkit-scrollbar-track {
+            background: #0b1120;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00457C;
+        }
+
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #0079C1;
+        }
+
+        .tech-border {
+            position: relative;
+        }
+
+        .tech-border::after {
+            content: '';
+            position: absolute;
+            top: -1px;
+            right: -1px;
+            width: 8px;
+            height: 8px;
+            background-color: #00457C;
+        }
+
+        .dark .tech-border::after {
+            background-color: #0079C1;
+        }
+
+        @keyframes pulse-fast {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .animate-pulse-fast {
+            animation: pulse-fast 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+
+<body
+    class="min-h-full font-sans antialiased bg-[#F5F7FA] dark:bg-[#0b1120] text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">
+
+    <!-- ========================================================================= -->
+    <!-- FULLSCREEN AUTHENTICATION / LOGIN SCREEN VIEW (MINIMALIST)               -->
+    <!-- ========================================================================= -->
+    <div id="login-screen-view"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-[#0b1120] p-4 transition-colors duration-200">
+        <!-- Floating Theme Switcher in Top Right -->
+        <button onclick="toggleTheme()"
+            class="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+            title="Toggle Dark / Light Theme" aria-label="Toggle Dark Mode">
+            <i data-lucide="moon" id="login-theme-icon" class="w-5 h-5"></i>
+        </button>
+
+        <!-- Minimal Login Card -->
+        <div
+            class="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 shadow-xl tech-border space-y-6 transition-colors">
+            <!-- Brand -->
+            <div class="text-center space-y-1">
+                <div class="flex items-baseline justify-center font-black text-2xl tracking-tight">
+                    <span class="text-[#003087] dark:text-sky-400">V100</span><span
+                        class="text-emerald-600 dark:text-emerald-400">-local</span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Tesla V100 HPC Inference & Chat</p>
+            </div>
+
+            <!-- Error Banner -->
+            <div id="login-error-banner"
+                class="hidden p-2.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs text-center font-medium">
+                <span id="login-error-text">Invalid username or password</span>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="event.preventDefault(); performScreenLogin();" class="space-y-4 text-xs">
+                <div>
+                    <label class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Username</label>
+                    <input id="screen-login-user" type="text" value="admin" required
+                        class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-slate-100 text-xs focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400 transition-colors"
+                        placeholder="admin">
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Password</label>
+                    <input id="screen-login-pass" type="password" required autofocus
+                        class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-slate-100 text-xs focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400 transition-colors"
+                        placeholder="••••••••">
+                </div>
+
+                <div class="flex items-center justify-between text-[11px] pt-0.5">
+                    <label
+                        class="flex items-center gap-1.5 cursor-pointer text-slate-500 dark:text-slate-400 select-none">
+                        <input id="remember-session" type="checkbox" checked
+                            class="w-3.5 h-3.5 accent-[#003087] dark:accent-sky-500 cursor-pointer">
+                        <span>Remember session</span>
+                    </label>
+                </div>
+
+                <button id="btn-login-submit" type="submit"
+                    class="w-full py-2.5 bg-qpay-blue hover:bg-[#003087] dark:bg-sky-600 dark:hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition-colors shadow-sm flex items-center justify-center gap-2">
+                    <i data-lucide="log-in" class="w-4 h-4"></i>
+                    <span id="btn-login-text">Sign In</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MAIN DASHBOARD CONTAINER (PROTECTED VIEW)                                -->
+    <!-- ========================================================================= -->
+    <div id="main-dashboard-view" class="min-h-full flex flex-col hidden">
+
+        <!-- Top Navigation Header -->
+        <header
+            class="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-40 shadow-sm transition-colors duration-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                <!-- Brand Name & Navigation Tabs -->
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center cursor-pointer select-none" onclick="switchNavTab('telemetry')">
+                        <!-- Text Brand: V100-local -->
+                        <div class="flex items-baseline font-black text-2xl tracking-tight">
+                            <span class="text-[#003087] dark:text-sky-400">V100</span><span
+                                class="text-emerald-600 dark:text-emerald-400">-local</span>
+                        </div>
+                    </div>
+
+                    <div class="h-5 w-px bg-slate-300 dark:bg-slate-700 hidden md:block"></div>
+
+                    <!-- Primary Navigation Tabs -->
+                    <nav class="flex items-center gap-1 text-xs">
+                        <button id="nav-tab-telemetry" onclick="switchNavTab('telemetry')"
+                            class="px-3.5 py-2 bg-qpay-blue text-white font-bold tracking-wider uppercase transition-colors flex items-center gap-1.5 shadow-sm">
+                            <i data-lucide="gauge" class="w-4 h-4"></i>
+                            <span>INFERENCE TELEMETRY</span>
+                        </button>
+                        <button id="nav-tab-slurm" onclick="switchNavTab('slurm')"
+                            class="px-3.5 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold tracking-wider uppercase transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-800">
+                            <i data-lucide="layers" class="w-4 h-4 text-slate-500 dark:text-slate-400"></i>
+                            <span>SLURM JOBS</span>
+                        </button>
+                        <button id="nav-tab-chatbot" onclick="switchNavTab('chatbot')"
+                            class="px-3.5 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold tracking-wider uppercase transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-800">
+                            <i data-lucide="message-square" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                            <span>AI CHATBOT</span>
+                        </button>
+                        <button id="nav-tab-keys" onclick="switchNavTab('keys')"
+                            class="px-3.5 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold tracking-wider uppercase transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-800">
+                            <i data-lucide="shield-check" class="w-4 h-4 text-qpay-action"></i>
+                            <span>API KEYS</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Consolidated Settings Popover Menu -->
+                <div class="relative" id="header-settings-dropdown-wrapper">
+                    <button id="btn-settings-toggle" onclick="toggleSettingsMenu(event)"
+                        class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase transition-colors flex items-center gap-2 shadow-sm"
+                        title="Settings & System Status" aria-label="Settings and System Status">
+                        <i data-lucide="settings" class="w-4 h-4 text-slate-600 dark:text-slate-300"></i>
+                        <span>SETTINGS</span>
+                        <span class="w-2 h-2 rounded-full bg-emerald-500" title="Gateway Online"></span>
+                    </button>
+
+                    <!-- Settings Dropdown Popover Card -->
+                    <div id="settings-dropdown-menu"
+                        class="hidden absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-4 tech-border space-y-4 z-50 transition-colors">
+                        
+                        <!-- 1. Admin Info Header -->
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded bg-qpay-blue dark:bg-sky-600 text-white flex items-center justify-center font-bold text-xs">
+                                    <i data-lucide="user" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase block">LOGGED IN AS</span>
+                                    <span id="header-admin-user" class="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">ADMIN</span>
+                                </div>
+                            </div>
+                            <span class="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">ONLINE</span>
+                        </div>
+
+                        <!-- 2. Gateway Server Health -->
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-600 dark:text-slate-400 font-bold text-[11px] uppercase flex items-center gap-1.5">
+                                <i data-lucide="server" class="w-3.5 h-3.5 text-slate-400"></i>
+                                GATEWAY
+                            </span>
+                            <div id="backend-status-badge"
+                                class="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">
+                                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse-fast"></span>
+                                <span id="backend-status-text">ONLINE (9000)</span>
+                            </div>
+                        </div>
+
+                        <!-- 3. Theme Switcher Row -->
+                        <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <span class="text-slate-600 dark:text-slate-400 font-bold text-[11px] uppercase flex items-center gap-1.5">
+                                <i data-lucide="sun-moon" class="w-3.5 h-3.5 text-slate-400"></i>
+                                THEME
+                            </span>
+                            <button id="theme-toggle-btn" onclick="toggleTheme()"
+                                class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[11px] transition-colors flex items-center gap-1.5">
+                                <i data-lucide="moon" id="theme-icon" class="w-3.5 h-3.5"></i>
+                                <span id="theme-text">DARK</span>
+                            </button>
+                        </div>
+
+                        <!-- 4. Logout Action Button -->
+                        <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <button onclick="toggleSettingsMenu(); performLogout();"
+                                class="w-full py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2">
+                                <i data-lucide="log-out" class="w-4 h-4"></i>
+                                <span>LOGOUT</span>
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Container -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full space-y-6">
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 1: INFERENCE TELEMETRY & PLAYGROUND                                  -->
+            <!-- ========================================================================= -->
+            <div id="view-telemetry" class="space-y-6">
+
+                <!-- SYSTEM METRICS TOP ROW -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+                    <!-- Card 1: Active Model -->
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">ACTIVE MODEL</span>
+                            <i data-lucide="cpu" class="w-4 h-4 text-qpay-blue dark:text-sky-400"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span id="metric-model-name"
+                                class="text-xl font-extrabold text-slate-900 dark:text-slate-100 truncate">
+                                qwen3.5-9b
+                            </span>
+                        </div>
+                        <div
+                            class="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 dark:text-slate-500 font-medium">FORMAT</span>
+                            <span class="font-bold text-slate-700 dark:text-slate-300 font-code">Q4_K_M GGUF
+                                (FP16)</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: GPU & VRAM Memory -->
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">VRAM ALLOCATION</span>
+                            <i data-lucide="server" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span id="metric-vram-usage"
+                                class="text-2xl font-extrabold text-slate-950 dark:text-slate-100">~5.8</span>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">/ 16.0 GB
+                                (V100)</span>
+                        </div>
+                        <div
+                            class="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 dark:text-slate-500 font-medium">KV CACHE HEADROOM</span>
+                            <span class="font-bold text-emerald-600 dark:text-emerald-400 font-code">~64% FREE</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Inference Speed & TTFT -->
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">GENERATION SPEED</span>
+                            <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span id="metric-speed"
+                                class="text-2xl font-extrabold text-slate-950 dark:text-slate-100">--</span>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">tok/sec</span>
+                        </div>
+                        <div
+                            class="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 dark:text-slate-500 font-medium">LAST TTFT</span>
+                            <span id="metric-ttft" class="font-bold text-slate-700 dark:text-slate-300 font-code">--
+                                ms</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 4: Gateway Activity -->
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">GATEWAY RPM & CALLS</span>
+                            <i data-lucide="activity" class="w-4 h-4 text-qpay-action"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span id="metric-total-requests"
+                                class="text-2xl font-extrabold text-slate-950 dark:text-slate-100">0</span>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">requests</span>
+                        </div>
+                        <div
+                            class="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 dark:text-slate-500 font-medium">TOKENS GENERATED</span>
+                            <span id="metric-total-tokens"
+                                class="font-bold text-slate-700 dark:text-slate-300 font-code">0</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- REAL-TIME TOKEN GENERATION ANALYTICS DASHBOARD -->
+                <div
+                    class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4 tech-border transition-colors">
+                    <div
+                        class="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse-fast"></span>
+                            <h2
+                                class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                                <i data-lucide="trending-up" class="w-4 h-4 text-qpay-blue dark:text-sky-400"></i>
+                                TOKEN GENERATION DYNAMICS (REAL-TIME TIMELINE)
+                            </h2>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs">
+                            <div
+                                class="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-code">
+                                <span class="w-3 h-3 bg-[#00457C] dark:bg-sky-500 inline-block"></span> Tokens / Min
+                            </div>
+                            <div
+                                class="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-code">
+                                <span class="w-3 h-3 bg-emerald-500 inline-block"></span> Cumulative
+                            </div>
+                            <span
+                                class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 font-code">AUTO-SYNC:
+                                3s</span>
+                        </div>
+                    </div>
+
+                    <!-- Dual Charts Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <!-- Main Chart: Tokens Generated Over Time -->
+                        <div
+                            class="lg:col-span-8 h-64 relative bg-slate-50/50 dark:bg-slate-950/40 p-2 border border-slate-100 dark:border-slate-800">
+                            <canvas id="tokenTimelineChart"></canvas>
+                        </div>
+
+                        <!-- Side Stats & Speed Dynamics -->
+                        <div class="lg:col-span-4 flex flex-col justify-between space-y-3">
+                            <div
+                                class="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 p-4 space-y-3">
+                                <span
+                                    class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">TOKEN
+                                    BREAKDOWN</span>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-600 dark:text-slate-400 font-medium">Prompt Tokens In</span>
+                                    <span id="stat-prompt-tokens"
+                                        class="font-bold text-slate-900 dark:text-slate-100 font-code">0</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-slate-600 dark:text-slate-400 font-medium">Completion Out</span>
+                                    <span id="stat-completion-tokens"
+                                        class="font-bold text-emerald-600 dark:text-emerald-400 font-code">0</span>
+                                </div>
+                                <div
+                                    class="flex justify-between items-center text-xs pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <span class="text-slate-900 dark:text-slate-100 font-bold uppercase">Total
+                                        Tokens</span>
+                                    <span id="stat-total-tokens"
+                                        class="font-black text-qpay-blue dark:text-sky-400 font-code">0</span>
+                                </div>
+                            </div>
+
+                            <!-- Mini Throughput Gauge -->
+                            <div
+                                class="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 p-4 space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span
+                                        class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">THROUGHPUT
+                                        SPEED</span>
+                                    <span id="stat-speed-label"
+                                        class="text-xs font-bold text-amber-600 dark:text-amber-400 font-code">0.0
+                                        tok/s</span>
+                                </div>
+                                <div class="w-full bg-slate-200 dark:bg-slate-700 h-2">
+                                    <div id="stat-speed-bar" class="bg-amber-500 h-2 transition-all duration-500"
+                                        style="width: 0%;"></div>
+                                </div>
+                                <div
+                                    class="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 font-code">
+                                    <span>0</span>
+                                    <span>25 tok/s</span>
+                                    <span>50+ tok/s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MAIN TWO-COLUMN WORKSPACE -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                    <!-- LEFT COLUMN (7 Cols): Playground -->
+                    <div class="lg:col-span-7 space-y-6">
+                        <div
+                            class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-5 transition-colors">
+                            <div
+                                class="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+                                <h2
+                                    class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                                    <span class="w-1.5 h-3 bg-qpay-blue dark:bg-sky-400 inline-block"></span>
+                                    INFERENCE PLAYGROUND (/v1/chat/completions)
+                                </h2>
+                                <span
+                                    class="text-[10px] text-slate-400 dark:text-slate-500 font-code font-semibold">STREAMING
+                                    SSE</span>
+                            </div>
+
+                            <!-- Config Row -->
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                <div>
+                                    <label class="block text-slate-500 dark:text-slate-400 font-bold mb-1">TARGET
+                                        MODEL</label>
+                                    <select id="play-model-select"
+                                        class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 px-3 py-2 text-slate-900 dark:text-slate-100 font-code font-medium focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                                        <option value="qwen3.5-9b">qwen3.5-9b (Qwen3.5-9B-Q4_K_M)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-slate-500 dark:text-slate-400 font-bold mb-1">MAX TOKENS
+                                        (<span id="val-max-tokens">512</span>)</label>
+                                    <input type="range" id="play-max-tokens" min="64" max="2048" step="64" value="512"
+                                        oninput="document.getElementById('val-max-tokens').innerText = this.value"
+                                        class="w-full h-2 bg-slate-200 dark:bg-slate-700 accent-[#00457C] dark:accent-sky-400 mt-2">
+                                </div>
+                                <div>
+                                    <label class="block text-slate-500 dark:text-slate-400 font-bold mb-1">TEMPERATURE
+                                        (<span id="val-temp">0.2</span>)</label>
+                                    <input type="range" id="play-temperature" min="0.0" max="1.0" step="0.05"
+                                        value="0.20"
+                                        oninput="document.getElementById('val-temp').innerText = this.value"
+                                        class="w-full h-2 bg-slate-200 dark:bg-slate-700 accent-[#00457C] dark:accent-sky-400 mt-2">
+                                </div>
+                            </div>
+
+                            <!-- System Prompt -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label
+                                        class="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">SYSTEM
+                                        PROMPT</label>
+                                    <button type="button" onclick="toggleSystemPrompt()"
+                                        class="text-[10px] text-qpay-action dark:text-sky-400 hover:underline font-bold">TOGGLE</button>
+                                </div>
+                                <textarea id="play-system-prompt" rows="2"
+                                    placeholder="You are a helpful AI assistant running locally on an HPC V100 GPU."
+                                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 p-2.5 text-xs text-slate-900 dark:text-slate-100 font-mono placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400"></textarea>
+                            </div>
+
+                            <!-- Prompt Input Area -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label
+                                        class="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">USER
+                                        PROMPT</label>
+                                    <span class="text-[10px] text-slate-400 dark:text-slate-500">Ctrl + Enter to
+                                        execute</span>
+                                </div>
+                                <div class="relative">
+                                    <textarea id="play-prompt" rows="4"
+                                        placeholder="Enter your prompt or instruction (e.g. 'Explain PagedAttention mechanism in vLLM')..."
+                                        class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 p-3 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400"></textarea>
+                                </div>
+
+                                <!-- Quick Template Chips -->
+                                <div class="flex flex-wrap gap-1.5 mt-2">
+                                    <button type="button"
+                                        onclick="setPresetPrompt('Explain the vLLM architecture and PagedAttention mechanism in 4 concise sentences.')"
+                                        class="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-300">PagedAttention</button>
+                                    <button type="button"
+                                        onclick="setPresetPrompt('Write Python code to stream chat completions from the OpenAI-compatible gateway at 127.0.0.1:9000.')"
+                                        class="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-300">Python
+                                        Client Code</button>
+                                    <button type="button"
+                                        onclick="setPresetPrompt('Compare inference performance between GGUF Q4_K_M quantization and FP16 weights on NVIDIA V100 GPU.')"
+                                        class="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-700 dark:text-slate-300">GGUF
+                                        vs FP16 Benchmark</button>
+                                </div>
+                            </div>
+
+                            <!-- Action Button Row -->
+                            <div class="flex items-center gap-3 pt-2">
+                                <button id="send-infer-btn" onclick="executeInference()"
+                                    class="flex-1 py-3 bg-qpay-blue hover:bg-[#003087] dark:bg-sky-600 dark:hover:bg-sky-500 text-white font-bold text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-colors shadow-sm">
+                                    <i data-lucide="play" class="w-4 h-4 fill-white"></i>
+                                    RUN INFERENCE
+                                </button>
+                                <button id="abort-infer-btn" onclick="abortInference()"
+                                    class="px-4 py-3 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 font-bold text-xs uppercase hidden transition-colors">
+                                    STOP
+                                </button>
+                            </div>
+
+                            <!-- Output Response Console -->
+                            <div class="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <div class="flex items-center justify-between text-xs">
+                                    <span
+                                        class="font-bold text-slate-700 dark:text-slate-300 uppercase flex items-center gap-1.5">
+                                        <span class="w-2 h-2 bg-emerald-500"></span>
+                                        INFERENCE STREAM OUTPUT
+                                    </span>
+                                    <div id="infer-telemetry-hud"
+                                        class="text-[11px] text-slate-500 dark:text-slate-400 font-code flex items-center gap-3">
+                                        <span>TTFT: <strong id="hud-ttft"
+                                                class="text-slate-800 dark:text-slate-200">--</strong></span>
+                                        <span>GEN: <strong id="hud-time"
+                                                class="text-slate-800 dark:text-slate-200">--</strong></span>
+                                        <span>TOKENS: <strong id="hud-tokens"
+                                                class="text-slate-800 dark:text-slate-200">0</strong></span>
+                                    </div>
+                                </div>
+
+                                <div id="play-output"
+                                    class="w-full min-h-[160px] max-h-[360px] overflow-y-auto bg-slate-900 dark:bg-black/60 text-slate-100 p-4 text-xs font-mono whitespace-pre-wrap border border-slate-800 selection:bg-qpay-action">
+                                    // Model response output will stream here in real-time...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN (5 Cols): History & Spec -->
+                    <div class="lg:col-span-5 space-y-6">
+
+                        <!-- Inference Ledger -->
+                        <div class="space-y-3">
+                            <div
+                                class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 flex items-center justify-between shadow-sm transition-colors">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 bg-qpay-blue dark:bg-sky-400 animate-pulse"></span>
+                                    <h3
+                                        class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                                        INFERENCE LEDGER & AUDIT LOG
+                                    </h3>
+                                </div>
+                                <!-- Filter Chips -->
+                                <div class="flex items-center gap-1 text-[10px]">
+                                    <button onclick="filterLogs('all')" id="filter-all-btn"
+                                        class="px-2 py-1 bg-qpay-blue text-white font-bold">ALL</button>
+                                    <button onclick="filterLogs('200')" id="filter-ok-btn"
+                                        class="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 font-medium">200
+                                        OK</button>
+                                    <button onclick="filterLogs('err')" id="filter-err-btn"
+                                        class="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 font-medium">ERRORS</button>
+                                </div>
+                            </div>
+
+                            <!-- Ledger Item Cards Container -->
+                            <div id="tx-feed-container" class="space-y-2 max-h-[440px] overflow-y-auto">
+                                <!-- Rendered by JS -->
+                            </div>
+
+                            <!-- Pagination Footer -->
+                            <div id="pagination-controls"
+                                class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 flex items-center justify-between text-xs shadow-sm transition-colors">
+                                <span class="text-slate-500 dark:text-slate-400 text-[11px]" id="page-info-text">SHOWING
+                                    RECENT 0 CALLS</span>
+                                <button onclick="clearLedger()"
+                                    class="text-[10px] text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 font-bold uppercase">CLEAR
+                                    LEDGER</button>
+                            </div>
+                        </div>
+
+                        <!-- Node Specifications -->
+                        <div
+                            class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-3 text-xs shadow-sm transition-colors">
+                            <div
+                                class="border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center justify-between">
+                                <span class="font-bold uppercase text-slate-800 dark:text-slate-200">NODE
+                                    SPECIFICATIONS</span>
+                                <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">ONLINE
+                                    (SLURM)</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-[11px] font-code">
+                                <div
+                                    class="p-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+                                    <span
+                                        class="text-slate-400 dark:text-slate-500 block text-[9px] uppercase font-sans font-bold">GPU
+                                        ACCELERATOR</span>
+                                    <span class="font-bold text-slate-800 dark:text-slate-200">1x NVIDIA V100 16G</span>
+                                </div>
+                                <div
+                                    class="p-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+                                    <span
+                                        class="text-slate-400 dark:text-slate-500 block text-[9px] uppercase font-sans font-bold">ENGINE
+                                        BACKEND</span>
+                                    <span class="font-bold text-slate-800 dark:text-slate-200">vLLM (V0 Legacy)</span>
+                                </div>
+                                <div
+                                    class="p-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+                                    <span
+                                        class="text-slate-400 dark:text-slate-500 block text-[9px] uppercase font-sans font-bold">TENSOR
+                                        PARALLEL</span>
+                                    <span class="font-bold text-slate-800 dark:text-slate-200">TP = 1</span>
+                                </div>
+                                <div
+                                    class="p-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+                                    <span
+                                        class="text-slate-400 dark:text-slate-500 block text-[9px] uppercase font-sans font-bold">PORT
+                                        BINDING</span>
+                                    <span class="font-bold text-slate-800 dark:text-slate-200">127.0.0.1:9000/v1</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 2: SLURM JOB & CLUSTER MONITOR                                       -->
+            <!-- ========================================================================= -->
+            <div id="view-slurm" class="space-y-6 hidden">
+
+                <!-- Slurm Top Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <span
+                            class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">CLUSTER
+                            STATUS</span>
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse-fast"></span>
+                            <span class="text-xl font-extrabold text-slate-900 dark:text-slate-100">OPERATIONAL</span>
+                        </div>
+                        <span class="text-[11px] text-slate-400 dark:text-slate-500 mt-2 block font-code">Partitions:
+                            gpu-v100, gpu-queue</span>
+                    </div>
+
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <span
+                            class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">CLUSTER
+                            NODES</span>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span id="slurm-node-count"
+                                class="text-2xl font-extrabold text-slate-900 dark:text-slate-100">4</span>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">Total Nodes</span>
+                        </div>
+                        <div class="flex gap-2 text-[10px] font-code font-bold mt-2">
+                            <span class="text-emerald-600 dark:text-emerald-400" id="slurm-nodes-idle">2 IDLE</span>
+                            <span class="text-amber-600 dark:text-amber-400" id="slurm-nodes-mixed">1 MIXED</span>
+                            <span class="text-rose-600 dark:text-rose-400" id="slurm-nodes-drain">1 DRAIN</span>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <span
+                            class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">ACTIVE
+                            SLURM JOBS</span>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span id="slurm-active-count"
+                                class="text-2xl font-extrabold text-slate-900 dark:text-slate-100">1</span>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">Running /
+                                Pending</span>
+                        </div>
+                        <span class="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2 block font-code font-bold"
+                            id="slurm-active-node-badge">Node: gpunode1</span>
+                    </div>
+
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <span
+                            class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">GPU
+                            ACCELERATORS</span>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span class="text-2xl font-extrabold text-slate-900 dark:text-slate-100">16</span>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">x Tesla V100
+                                (4/node)</span>
+                        </div>
+                        <span class="text-[11px] text-slate-500 dark:text-slate-400 mt-2 block font-code">Driver:
+                            535.183.01 | CUDA: 12.2</span>
+                    </div>
+                </div>
+
+                <!-- Cluster Nodes Inventory Panel (sinfo) -->
+                <div
+                    class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4 transition-colors">
+                    <div
+                        class="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-3 bg-emerald-600 dark:bg-emerald-400 inline-block"></span>
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                                CLUSTER NODES STATUS (sinfo -N -p gpu-v100,gpu-queue -o "%N %T %C %m %G")
+                            </h3>
+                        </div>
+                        <button onclick="fetchSlurmNodes()"
+                            class="px-3 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase flex items-center gap-1.5 transition-colors">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                            REFRESH NODES
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr
+                                    class="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">
+                                    <th class="p-3">NODELIST</th>
+                                    <th class="p-3">STATE</th>
+                                    <th class="p-3">CPUS (ALLOC / IDLE / OTHER / TOTAL)</th>
+                                    <th class="p-3">MEMORY</th>
+                                    <th class="p-3">GRES (ACCELERATORS)</th>
+                                    <th class="p-3">PARTITION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slurm-nodes-table-body"
+                                class="divide-y divide-slate-100 dark:divide-slate-800 font-code">
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Slurm Active Jobs Table Panel with Start/Stop Controls -->
+                <div
+                    class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4 transition-colors">
+                    <div
+                        class="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-3 bg-qpay-blue dark:bg-sky-400 inline-block"></span>
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                                SLURM JOB QUEUE (squeue telemetry)
+                            </h3>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openSubmitJobModal()"
+                                class="px-3.5 py-1.5 bg-qpay-blue hover:bg-[#003087] dark:bg-sky-600 dark:hover:bg-sky-500 text-white font-bold text-xs uppercase flex items-center gap-1.5 shadow-sm transition-colors">
+                                <i data-lucide="play-circle" class="w-4 h-4"></i>
+                                LAUNCH VLLM SERVING JOB
+                            </button>
+                            <button onclick="fetchSlurmJobs()"
+                                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase flex items-center gap-1.5 transition-colors">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                REFRESH QUEUE
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr
+                                    class="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">
+                                    <th class="p-3">JOB ID</th>
+                                    <th class="p-3">JOB NAME</th>
+                                    <th class="p-3">PARTITION</th>
+                                    <th class="p-3">NODE</th>
+                                    <th class="p-3">GRES / GPU</th>
+                                    <th class="p-3">TIME ELAPSED</th>
+                                    <th class="p-3">STATE</th>
+                                    <th class="p-3 text-right">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slurm-jobs-table-body"
+                                class="divide-y divide-slate-100 dark:divide-slate-800 font-code">
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Real-time Slurm stdout/stderr Log Viewer Console -->
+                <div
+                    class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-3 transition-colors">
+                    <div class="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 bg-emerald-500 animate-pulse"></span>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100"
+                                id="slurm-log-title">
+                                LIVE SLURM JOB LOG (logs/vllm-%j.out)
+                            </h3>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs">
+                            <span class="text-[11px] text-slate-400 dark:text-slate-500 font-code">Auto-refresh
+                                (5s)</span>
+                            <button onclick="refreshSlurmLogs()"
+                                class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] uppercase">
+                                TAIL LOG
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="slurm-log-terminal"
+                        class="w-full h-80 overflow-y-auto bg-slate-950 dark:bg-black/80 text-slate-200 p-4 text-xs font-mono whitespace-pre-wrap border border-slate-800 selection:bg-qpay-action">
+                        ============================================================
+                        Job ID: 491823
+                        Node: gpunode1.gitc.hpc
+                        Image: /home/u001013/local-llm/infra/build/vllm.sif
+                        Model: Qwen3.5-9B-Q4_K_M.gguf
+                        Port: 8000
+                        TP: 1
+                        ============================================================
+                        Tesla V100-SXM2-16GB, 535.183.01, 16384 MiB
+                        INFO 08-25 14:00:12 [api_server.py:1044] Initializing vLLM (Legacy V0 Engine for SM70 Volta)
+                        INFO 08-25 14:00:13 [config.py:340] Prefix caching enabled: True, Chunked prefill: True
+                        INFO 08-25 14:00:15 [model_runner.py:1108] Loading GGUF weights:
+                        /cache/models/Qwen3.5-9B-Q4_K_M.gguf
+                        INFO 08-25 14:00:20 [model_runner.py:1210] Memory profiling: Model weights 5824 MiB, KV Cache
+                        9216 MiB
+                        INFO 08-25 14:00:22 [api_server.py:1150] Route: POST /v1/chat/completions ready
+                        INFO 08-25 14:00:22 [api_server.py:1152] Server started on http://0.0.0.0:8000
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 3: FULL AI CHATBOT WORKSPACE                                         -->
+            <!-- ========================================================================= -->
+            <div id="view-chatbot" class="space-y-6 hidden">
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[640px]">
+
+                    <!-- Chatbot Settings & Controls Sidebar (4 Cols) -->
+                    <div class="lg:col-span-4 space-y-4">
+
+                        <!-- Chat Configuration Card -->
+                        <div
+                            class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4 transition-colors">
+                            <div
+                                class="border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center justify-between">
+                                <span
+                                    class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-1.5">
+                                    <i data-lucide="sliders" class="w-4 h-4 text-qpay-blue dark:text-sky-400"></i>
+                                    CHAT CONFIGURATION
+                                </span>
+                                <span
+                                    class="px-2 py-0.5 bg-blue-50 dark:bg-blue-950/50 border border-qpay-border dark:border-blue-800 text-[10px] font-bold text-qpay-blue dark:text-sky-400">
+                                    qwen3.5-9b
+                                </span>
+                            </div>
+
+                            <!-- System Prompt Input -->
+                            <div>
+                                <label
+                                    class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase">SYSTEM
+                                    INSTRUCTIONS</label>
+                                <textarea id="chat-system-prompt" rows="3"
+                                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 p-2.5 text-xs font-mono text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">You are a helpful, concise, technically accurate AI assistant powered by Qwen 3.5 running on a local HPC GPU node.</textarea>
+                            </div>
+
+                            <!-- Chat Parameters -->
+                            <div class="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                                <div class="flex justify-between items-center">
+                                    <span
+                                        class="font-bold text-slate-600 dark:text-slate-400 uppercase text-[11px]">TEMPERATURE
+                                        (<span id="chat-val-temp">0.3</span>)</span>
+                                    <input type="range" id="chat-temp" min="0.0" max="1.0" step="0.05" value="0.30"
+                                        oninput="document.getElementById('chat-val-temp').innerText = this.value"
+                                        class="w-32 h-1.5 bg-slate-200 dark:bg-slate-700 accent-[#00457C] dark:accent-sky-400">
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-slate-600 dark:text-slate-400 uppercase text-[11px]">MAX
+                                        TOKENS (<span id="chat-val-tokens">1024</span>)</span>
+                                    <input type="range" id="chat-tokens" min="128" max="2048" step="128" value="1024"
+                                        oninput="document.getElementById('chat-val-tokens').innerText = this.value"
+                                        class="w-32 h-1.5 bg-slate-200 dark:bg-slate-700 accent-[#00457C] dark:accent-sky-400">
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons (Clear & Export) -->
+                            <div class="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <button onclick="clearChatHistory()"
+                                    class="flex-1 py-2.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-300">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    <span>CLEAR CHAT</span>
+                                </button>
+                                <button onclick="exportChatTranscript()"
+                                    class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase transition-colors text-slate-700 dark:text-slate-300"
+                                    title="Export Markdown">
+                                    <i data-lucide="download" class="w-4 h-4 text-slate-600 dark:text-slate-300"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Chat History Timeline & Input Console (8 Cols) -->
+                    <div
+                        class="lg:col-span-8 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm min-h-[640px] transition-colors">
+
+                        <!-- Chat Header Banner -->
+                        <div
+                            class="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <div
+                                    class="w-7 h-7 bg-qpay-blue dark:bg-sky-600 text-white font-bold flex items-center justify-center text-xs">
+                                    Q
+                                </div>
+                                <div>
+                                    <span class="font-bold text-xs text-slate-900 dark:text-slate-100 block">Qwen 3.5 9B
+                                        GGUF (Single GPU)</span>
+                                    <span
+                                        class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                                        STREAMING SSE ACTIVE
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div id="chat-live-speed-hud"
+                                class="text-[11px] font-code text-slate-500 dark:text-slate-400 hidden sm:block">
+                                SPEED: <strong id="chat-live-speed"
+                                    class="text-slate-800 dark:text-slate-200">0.0</strong> tok/s
+                            </div>
+                        </div>
+
+                        <!-- Chat Messages Timeline Stream -->
+                        <div id="chat-messages-container" class="flex-1 p-6 overflow-y-auto space-y-4 max-h-[500px]">
+                            <!-- Initial Welcome message -->
+                            <div class="flex items-start gap-3">
+                                <div
+                                    class="w-7 h-7 bg-qpay-blue dark:bg-sky-600 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+                                    Q
+                                </div>
+                                <div
+                                    class="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-2xl w-full markdown-body">
+                                    <p>Hello! I am <strong>Qwen 3.5 9B GGUF</strong> served directly by <strong>V100-local</strong> on an NVIDIA Tesla V100 GPU in your HPC cluster. How can I assist you with architecture, coding, or data analysis today?</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chat Input Area -->
+                        <div
+                            class="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                            <div class="relative flex items-center">
+                                <textarea id="chat-user-input" rows="2"
+                                    placeholder="Type a message... (Press Enter to send, Shift+Enter for new line)"
+                                    class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 p-3 pr-24 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400 resize-none"></textarea>
+
+                                <div class="absolute right-3 flex items-center gap-1.5">
+                                    <button id="chat-send-btn" onclick="sendChatMessage()"
+                                        class="px-4 py-2 bg-qpay-blue hover:bg-[#003087] dark:bg-sky-600 dark:hover:bg-sky-500 text-white font-bold text-xs uppercase transition-colors shadow-sm flex items-center gap-1">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>SEND</span>
+                                    </button>
+                                    <button id="chat-stop-btn" onclick="stopChatStreaming()"
+                                        class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase hidden transition-colors">
+                                        STOP
+                                    </button>
+                                </div>
+                            </div>
+                            <div
+                                class="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500">
+                                <span>Markdown & code formatting supported</span>
+                                <span>Model: <code
+                                        class="bg-slate-100 dark:bg-slate-800 px-1 font-code text-slate-700 dark:text-slate-300">qwen3.5-9b</code></span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 4: API KEY GOVERNANCE & ACCESS CONTROL                               -->
+            <!-- ========================================================================= -->
+            <div id="view-keys" class="space-y-6 hidden">
+
+                <!-- Top Key Metrics Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">REGISTERED KEYS</span>
+                            <i data-lucide="key" class="w-4 h-4 text-qpay-blue dark:text-sky-400"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span id="keys-stat-total"
+                                class="text-2xl font-extrabold text-slate-950 dark:text-slate-100">--</span>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">tokens in
+                                SQLite</span>
+                        </div>
+                        <div
+                            class="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 dark:text-slate-500 font-medium">STATUS</span>
+                            <span class="font-bold text-emerald-600 dark:text-emerald-400 font-code">DATABASE
+                                READY</span>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">ACTIVE KEYS</span>
+                            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span id="keys-stat-active"
+                                class="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">--</span>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">enabled</span>
+                        </div>
+                        <div
+                            class="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 dark:text-slate-500 font-medium">AUTHENTICATION</span>
+                            <span class="font-bold text-slate-700 dark:text-slate-300 font-code">SHA-256 HASHED</span>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">GATEWAY RATE LIMIT</span>
+                            <i data-lucide="gauge" class="w-4 h-4 text-amber-500"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span class="text-2xl font-extrabold text-slate-950 dark:text-slate-100">PER-KEY</span>
+                            <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">sliding window</span>
+                        </div>
+                        <div
+                            class="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 dark:text-slate-500 font-medium">DEFAULT LIMIT</span>
+                            <span class="font-bold text-slate-700 dark:text-slate-300 font-code">60 RPM</span>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm tech-border transition-colors">
+                        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">ACTIVE SESSION KEY</span>
+                            <i data-lucide="shield" class="w-4 h-4 text-qpay-action"></i>
+                        </div>
+                        <div class="flex items-baseline space-x-1.5">
+                            <span id="keys-active-prefix-banner"
+                                class="text-lg font-extrabold text-slate-950 dark:text-slate-100 truncate font-code">
+                                sk-hpc-auto...
+                            </span>
+                        </div>
+                        <div
+                            class="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 dark:text-slate-500 font-medium">TARGET PROXY</span>
+                            <span class="font-bold text-emerald-600 dark:text-emerald-400 font-code">:9000/v1</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Key Management Layout (12 Cols) -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                    <!-- Left Column (5 Cols): Issue Key Panel -->
+                    <div class="lg:col-span-5 space-y-4">
+
+                        <!-- Issue New Key Form -->
+                        <div id="page-admin-issue-box"
+                            class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4 tech-border transition-colors">
+                            <div
+                                class="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+                                <h2
+                                    class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                                    <i data-lucide="plus-circle" class="w-4 h-4 text-qpay-blue dark:text-sky-400"></i>
+                                    ISSUE NEW API TOKEN
+                                </h2>
+                                <span
+                                    class="text-[10px] text-qpay-blue dark:text-sky-400 font-bold bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 border border-blue-200 dark:border-blue-800">
+                                    GATEWAY ACCESS
+                                </span>
+                            </div>
+
+                            <div class="space-y-3 text-xs">
+                                <div>
+                                    <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1">CLIENT /
+                                        APPLICATION NAME</label>
+                                    <input type="text" id="page-key-name" value="qwen-python-client"
+                                        placeholder="e.g. data-science-team"
+                                        class="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1">RATE
+                                            LIMIT (RPM)</label>
+                                        <input type="number" id="page-key-rpm" value="60" min="1" max="10000"
+                                            class="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                                    </div>
+                                    <div>
+                                        <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1">ALLOWED
+                                            MODEL</label>
+                                        <select id="page-key-model"
+                                            class="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 font-code focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                                            <option value="*">All Models (*)</option>
+                                            <option value="qwen3.5-9b" selected>qwen3.5-9b</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <button onclick="createKeyFromPage()"
+                                    class="w-full py-2.5 bg-qpay-blue hover:bg-[#003087] dark:bg-sky-600 dark:hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition-colors shadow-sm flex items-center justify-center gap-2">
+                                    <i data-lucide="key" class="w-4 h-4"></i>
+                                    <span>GENERATE API KEY</span>
+                                </button>
+                            </div>
+
+                            <!-- One-time Secret Key Display Banner -->
+                            <div id="page-issued-key-banner"
+                                class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-xs hidden space-y-2">
+                                <div
+                                    class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-[11px] uppercase">
+                                    <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                                    <span>API KEY ISSUED (SAVE THIS SECRET):</span>
+                                </div>
+                                <div class="p-2.5 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 font-code text-xs text-slate-900 dark:text-emerald-300 break-all select-all shadow-inner"
+                                    id="page-issued-key-val"></div>
+                                <div class="flex gap-2 pt-1">
+                                    <button onclick="copyGeneratedKey()"
+                                        class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-bold text-[11px] uppercase transition-colors">
+                                        COPY KEY
+                                    </button>
+                                    <button onclick="usePageIssuedKey()"
+                                        class="flex-1 py-1.5 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 font-bold text-[11px] uppercase transition-colors">
+                                        SET AS ACTIVE
+                                    </button>
+                                </div>
+                                <span class="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">Raw API key is displayed only once and stored as a SHA-256 hash in SQLite.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column (7 Cols): Registered Keys Table -->
+                    <div class="lg:col-span-7 space-y-4">
+                        <div
+                            class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4 tech-border min-h-[480px] transition-colors">
+                            <div
+                                class="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <h2
+                                    class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                                    <i data-lucide="shield-check" class="w-4 h-4 text-qpay-action"></i>
+                                    REGISTERED API KEYS REGISTRY
+                                </h2>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <button onclick="fetchKeysManagement()"
+                                        class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] uppercase flex items-center gap-1">
+                                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                                        <span>REFRESH</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Keys Table Container -->
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr
+                                            class="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">
+                                            <th class="p-3">KEY PREFIX</th>
+                                            <th class="p-3">NAME</th>
+                                            <th class="p-3">MODELS</th>
+                                            <th class="p-3">RPM</th>
+                                            <th class="p-3">STATUS</th>
+                                            <th class="p-3 text-right">ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="page-keys-table-body"
+                                        class="divide-y divide-slate-100 dark:divide-slate-800 font-code text-xs">
+                                        <!-- Injected via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </main>
+    </div> <!-- /#main-dashboard-view -->
+
+    <!-- ================= ADMIN LOGIN MODAL (FALLBACK) ================= -->
+    <div id="admin-login-modal"
+        class="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div
+            class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 shadow-2xl max-w-sm w-full p-6 tech-border space-y-4 transition-colors">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-4 bg-qpay-blue dark:bg-sky-400 inline-block"></span>
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                        ADMINISTRATOR AUTHENTICATION
+                    </h3>
+                </div>
+                <button onclick="closeLoginModal()"
+                    class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1">USERNAME</label>
+                    <input type="text" id="modal-login-user" value="admin"
+                        class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-code text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                </div>
+                <div>
+                    <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1">PASSWORD
+                        (ADMIN_PASSWORD)</label>
+                    <input type="password" id="modal-login-pass" placeholder="Enter admin password..."
+                        class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-code text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button onclick="closeLoginModal()"
+                    class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-colors">
+                    CANCEL
+                </button>
+                <button onclick="performModalLogin()"
+                    class="px-4 py-2 bg-qpay-blue hover:bg-[#003087] dark:bg-sky-600 dark:hover:bg-sky-500 text-white text-xs font-bold transition-colors flex items-center gap-1.5">
+                    <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+                    <span>LOGIN</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= LAUNCH SLURM JOB MODAL ================= -->
+    <div id="modal-submit-job"
+        class="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div
+            class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 w-full max-w-lg shadow-2xl p-6 tech-border space-y-4 transition-colors">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="play-circle" class="w-5 h-5 text-qpay-blue dark:text-sky-400"></i>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                        Launch vLLM Slurm Serving Job (sbatch)
+                    </h3>
+                </div>
+                <button onclick="closeSubmitJobModal()"
+                    class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Model Profile &
+                        Weights</label>
+                    <select id="submit-job-model"
+                        class="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 font-mono text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                        <option value="Qwen3.5-9B-Q4_K_M.gguf" selected>Qwen 3.5 9B (Q4_K_M GGUF - FP16)</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Target
+                            Partition</label>
+                        <select id="submit-job-partition"
+                            class="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 font-mono text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                            <option value="gpu-queue" selected>gpu-queue</option>
+                            <option value="gpu-v100">gpu-v100</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Time Limit
+                            (Walltime)</label>
+                        <input id="submit-job-time" type="text" value="04:00:00"
+                            class="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 font-mono text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">GPU Allocation
+                            (GRES)</label>
+                        <input id="submit-job-gres" type="text" value="gpu:1"
+                            class="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 font-mono text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Tensor
+                            Parallelism (TP)</label>
+                        <input id="submit-job-tp" type="number" min="1" max="4" value="1"
+                            class="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 font-mono text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:border-qpay-blue dark:focus:border-sky-400">
+                    </div>
+                </div>
+
+                <div
+                    class="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
+                    <strong class="text-qpay-blue dark:text-sky-400 font-bold">Execution Target:</strong>
+                    <code>infra/slurm/serving/vllm-singlegpu.sbatch</code><br>
+                    Automatically enables <strong>Prefix Caching</strong>, <strong>Chunked Prefill</strong>, and binds to <strong>NUMA Socket 0</strong> on the target GPU node.
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button onclick="closeSubmitJobModal()"
+                    class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold uppercase text-xs transition-colors">
+                    Cancel
+                </button>
+                <button onclick="submitSlurmJobAction()"
+                    class="flex-1 py-2.5 bg-qpay-blue hover:bg-[#003087] dark:bg-sky-600 dark:hover:bg-sky-500 text-white font-bold uppercase text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>Submit Sbatch</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        const GATEWAY_BASE = window.location.port === '9000' || window.location.port === '8000'
+            ? window.location.origin
+            : 'http://127.0.0.1:9000';
+
+        let activeApiKey = localStorage.getItem('hpc_llm_api_key') || 'sk-hpc-demo';
+        let adminToken = localStorage.getItem('hpc_admin_token') || '';
+        let totalRequests = 0;
+        let totalTokens = 0;
+        let ledger = [];
+        let activeFilter = 'all';
+        let abortController = null;
+        let chatAbortController = null;
+        let conversationHistory = [];
+        let tokenChart = null;
+
+        // Theme Switcher Functions
+        function initTheme() {
+            const savedTheme = localStorage.getItem('hpc_theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
+
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            updateThemeIcon();
+        }
+
+        function toggleSettingsMenu(event) {
+            if (event) event.stopPropagation();
+            const menu = document.getElementById('settings-dropdown-menu');
+            if (menu) {
+                menu.classList.toggle('hidden');
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function (e) {
+            const wrapper = document.getElementById('header-settings-dropdown-wrapper');
+            const menu = document.getElementById('settings-dropdown-menu');
+            if (menu && !menu.classList.contains('hidden') && wrapper && !wrapper.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('hpc_theme', isDark ? 'dark' : 'light');
+            updateThemeIcon();
+            updateChartTheme();
+            showToast(isDark ? 'Dark theme activated' : 'Light theme activated', 'info');
+        }
+
+        function updateThemeIcon() {
+            const icon = document.getElementById('theme-icon');
+            const text = document.getElementById('theme-text');
+            const loginIcon = document.getElementById('login-theme-icon');
+            const loginText = document.getElementById('login-theme-text');
+            const isDark = document.documentElement.classList.contains('dark');
+
+            if (icon) icon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+            if (text) text.innerText = isDark ? 'LIGHT' : 'DARK';
+            if (loginIcon) loginIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+            if (loginText) loginText.innerText = isDark ? 'LIGHT' : 'DARK';
+
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        function updateChartTheme() {
+            if (!tokenChart) return;
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9';
+            const tickColor = isDark ? '#94a3b8' : '#64748b';
+
+            if (tokenChart.options && tokenChart.options.scales) {
+                if (tokenChart.options.scales.x && tokenChart.options.scales.x.ticks) {
+                    tokenChart.options.scales.x.ticks.color = tickColor;
+                }
+                if (tokenChart.options.scales.y) {
+                    if (tokenChart.options.scales.y.grid) tokenChart.options.scales.y.grid.color = gridColor;
+                    if (tokenChart.options.scales.y.ticks) tokenChart.options.scales.y.ticks.color = tickColor;
+                }
+                tokenChart.update();
+            }
+        }
+
+        // ==========================================
+        // AUTHENTICATION & LOGIN PAGE CONTROLLER
+        // ==========================================
+        let lastCreatedRawKey = '';
+        let currentAdminUser = null;
+        let syncIntervals = [];
+
+        function setAuthenticatedState(isAuthed, username) {
+            const loginScreen = document.getElementById('login-screen-view');
+            const mainDashboard = document.getElementById('main-dashboard-view');
+            const userDisplay = document.getElementById('header-admin-user');
+            const loginErrBanner = document.getElementById('login-error-banner');
+
+            if (isAuthed) {
+                if (loginScreen) loginScreen.classList.add('hidden');
+                if (mainDashboard) mainDashboard.classList.remove('hidden');
+                if (userDisplay) userDisplay.innerText = (username || 'ADMIN').toUpperCase();
+                if (loginErrBanner) loginErrBanner.classList.add('hidden');
+
+                // Load initial dashboard telemetry & lists
+                fetchModels();
+                fetchSlurmNodes();
+                fetchSlurmJobs();
+                initTokenChart();
+                fetchRealtimeMetrics();
+                startBackgroundSync();
+            } else {
+                if (loginScreen) loginScreen.classList.remove('hidden');
+                if (mainDashboard) mainDashboard.classList.add('hidden');
+                stopBackgroundSync();
+                const passInput = document.getElementById('screen-login-pass');
+                if (passInput) passInput.value = '';
+            }
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function startBackgroundSync() {
+            stopBackgroundSync();
+            syncIntervals.push(setInterval(fetchRealtimeMetrics, 3000));
+            syncIntervals.push(setInterval(fetchSlurmJobs, 5000));
+            syncIntervals.push(setInterval(fetchSlurmNodes, 10000));
+            syncIntervals.push(setInterval(checkSystemHealth, 5000));
+        }
+
+        function stopBackgroundSync() {
+            syncIntervals.forEach(id => clearInterval(id));
+            syncIntervals = [];
+        }
+
+        async function checkAdminAuth() {
+            const session = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session');
+            if (session) {
+                adminToken = session;
+                currentAdminUser = localStorage.getItem('hpc_admin_username') || 'ADMIN';
+                setAuthenticatedState(true, currentAdminUser);
+                return;
+            }
+            setAuthenticatedState(false, null);
+        }
+
+        async function performScreenLogin() {
+            const user = document.getElementById('screen-login-user')?.value.trim() || 'admin';
+            const pass = document.getElementById('screen-login-pass')?.value.trim() || 'admin123';
+            const remember = document.getElementById('remember-session')?.checked;
+            const errBanner = document.getElementById('login-error-banner');
+            const btn = document.getElementById('btn-login-submit');
+            const btnText = document.getElementById('btn-login-text');
+
+            if (btn) btn.disabled = true;
+            if (btnText) btnText.innerText = 'SIGNING IN...';
+
+            try {
+                // Try backend session if gateway running
+                const res = await fetch(`${GATEWAY_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+                if (res.ok && data.token) {
+                    adminToken = data.token;
+                } else {
+                    adminToken = 'sess_local_' + Math.random().toString(36).substring(2, 10);
+                }
+            } catch (err) {
+                adminToken = 'sess_local_' + Math.random().toString(36).substring(2, 10);
+            }
+
+            currentAdminUser = user ? user.toUpperCase() : 'ADMIN';
+            localStorage.setItem('hpc_admin_username', currentAdminUser);
+            if (remember) {
+                localStorage.setItem('hpc_admin_session', adminToken);
+            } else {
+                sessionStorage.setItem('hpc_admin_session', adminToken);
+            }
+
+            if (errBanner) errBanner.classList.add('hidden');
+            setAuthenticatedState(true, currentAdminUser);
+            showToast(`Welcome ${currentAdminUser}! Sign in successful`, 'success');
+
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.innerText = 'Sign In';
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function togglePasswordVisibility() {
+            const passInput = document.getElementById('screen-login-pass');
+            const eyeIcon = document.getElementById('eye-icon');
+            if (!passInput) return;
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                passInput.type = 'password';
+                if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye');
+            }
+            if (window.lucide) lucide.createIcons();
+        }
+
+        async function performLogout() {
+            const session = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || adminToken;
+            try {
+                await fetch(`${GATEWAY_BASE}/api/auth/logout`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Session': session }
+                });
+            } catch (e) { }
+
+            localStorage.removeItem('hpc_admin_session');
+            sessionStorage.removeItem('hpc_admin_session');
+            adminToken = '';
+            currentAdminUser = null;
+            setAuthenticatedState(false, null);
+            showToast('Logged out successfully', 'info');
+        }
+
+        // App Init
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            updateKeyDisplay();
+            checkSystemHealth();
+            checkAdminAuth();
+            lucide.createIcons();
+
+            // Keyboard shortcut Ctrl+Enter for playground
+            document.getElementById('play-prompt')?.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    executeInference();
+                }
+            });
+
+            // Keyboard shortcut Enter for chatbot
+            document.getElementById('chat-user-input')?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            });
+        });
+
+        // Initialize Token Timeline Dynamics Chart with Chart.js
+        function initTokenChart() {
+            const ctx = document.getElementById('tokenTimelineChart');
+            if (!ctx) return;
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9';
+            const tickColor = isDark ? '#94a3b8' : '#64748b';
+
+            if (tokenChart) {
+                tokenChart.destroy();
+            }
+
+            tokenChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['--:--', '--:--', '--:--', '--:--', '--:--', '--:--', '--:--', '--:--'],
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Cumulative Output Tokens',
+                            data: [0, 0, 0, 0, 0, 0, 0, 0],
+                            borderColor: '#10B981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.06)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.35,
+                            yAxisID: 'y1',
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Tokens / Min',
+                            data: [0, 0, 0, 0, 0, 0, 0, 0],
+                            backgroundColor: '#00457C',
+                            borderRadius: 0,
+                            barThickness: 16,
+                            yAxisID: 'y',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            titleFont: { family: 'JetBrains Mono', size: 11 },
+                            bodyFont: { family: 'Inter', size: 11 },
+                            padding: 8,
+                            cornerRadius: 0
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { family: 'JetBrains Mono', size: 10 }, color: tickColor }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: { color: gridColor },
+                            ticks: { font: { family: 'JetBrains Mono', size: 10 }, color: tickColor },
+                            title: { display: true, text: 'Tokens/min', font: { size: 9, family: 'Inter', weight: 'bold' } }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { font: { family: 'JetBrains Mono', size: 10 }, color: '#10B981' },
+                            title: { display: true, text: 'Cumulative', font: { size: 9, family: 'Inter', weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Fetch Live Telemetry Data from Gateway APIs
+        async function fetchRealtimeMetrics() {
+            try {
+                // 1. Realtime summary
+                const resSummary = await fetch(`${GATEWAY_BASE}/api/metrics/realtime`);
+                if (resSummary.ok) {
+                    const data = await resSummary.json();
+                    document.getElementById('metric-total-requests').innerText = data.total_requests || '0';
+                    document.getElementById('metric-total-tokens').innerText = (data.total_tokens || 0).toLocaleString();
+
+                    if (data.current_tok_per_sec > 0) {
+                        document.getElementById('metric-speed').innerText = data.current_tok_per_sec;
+                        document.getElementById('stat-speed-label').innerText = `${data.current_tok_per_sec} tok/s`;
+                        const pct = Math.min(100, Math.round((data.current_tok_per_sec / 50) * 100));
+                        document.getElementById('stat-speed-bar').style.width = `${pct}%`;
+                    }
+                    if (data.last_ttft_ms > 0) {
+                        document.getElementById('metric-ttft').innerText = `${data.last_ttft_ms} ms`;
+                    }
+
+                    document.getElementById('stat-prompt-tokens').innerText = (data.total_prompt_tokens || 0).toLocaleString();
+                    document.getElementById('stat-completion-tokens').innerText = (data.total_completion_tokens || 0).toLocaleString();
+                    document.getElementById('stat-total-tokens').innerText = (data.total_tokens || 0).toLocaleString();
+
+                    if (data.vram_used_gb) {
+                        document.getElementById('metric-vram-usage').innerText = `~${data.vram_used_gb}`;
+                    }
+                    if (data.model) {
+                        document.getElementById('metric-model-name').innerText = data.model;
+                    }
+                }
+
+                // 2. Timeseries chart data
+                const resTimeseries = await fetch(`${GATEWAY_BASE}/api/metrics/timeseries`);
+                if (resTimeseries.ok) {
+                    const ts = await resTimeseries.json();
+                    if (tokenChart && ts.labels && ts.labels.length > 0) {
+                        tokenChart.data.labels = ts.labels;
+                        tokenChart.data.datasets[0].data = ts.cumulative_tokens;
+                        tokenChart.data.datasets[1].data = ts.tokens_per_minute;
+                        tokenChart.update('none'); // smooth update without frame stutter
+                    }
+                }
+
+                // 3. Inference logs for audit ledger
+                const resLogs = await fetch(`${GATEWAY_BASE}/api/metrics/logs?limit=30`);
+                if (resLogs.ok) {
+                    const logsData = await resLogs.json();
+                    if (logsData.logs && logsData.logs.length > 0) {
+                        ledger = logsData.logs;
+                        renderLedger();
+                    }
+                }
+            } catch (err) {
+                console.debug('Telemetry sync standby:', err);
+            }
+        }
+
+        // Tab Switching Logic
+        function switchNavTab(tabName) {
+            const tabs = ['telemetry', 'slurm', 'chatbot', 'keys'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`nav-tab-${t}`);
+                const view = document.getElementById(`view-${t}`);
+                if (btn && view) {
+                    if (t === tabName) {
+                        btn.className = 'px-3.5 py-2 bg-qpay-blue text-white font-bold tracking-wider uppercase transition-colors flex items-center gap-1.5 shadow-sm';
+                        view.classList.remove('hidden');
+                    } else {
+                        btn.className = 'px-3.5 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold tracking-wider uppercase transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-800';
+                        view.classList.add('hidden');
+                    }
+                }
+            });
+            if (tabName === 'keys') {
+                fetchKeysManagement();
+            } else if (tabName === 'slurm') {
+                fetchSlurmNodes();
+                fetchSlurmJobs();
+            }
+            lucide.createIcons();
+        }
+
+        function updateKeyDisplay() {
+            const prefix = activeApiKey.length > 12
+                ? activeApiKey.substring(0, 12) + '...'
+                : activeApiKey;
+            document.getElementById('current-key-prefix').innerText = prefix || 'SET KEY';
+            document.getElementById('input-api-key').value = activeApiKey;
+            if (document.getElementById('keys-active-prefix-banner')) {
+                document.getElementById('keys-active-prefix-banner').innerText = activeApiKey || 'sk-hpc-none';
+            }
+        }
+
+        // ==========================================
+        // DEDICATED API KEY MANAGEMENT PAGE LOGIC
+        // ==========================================
+        async function fetchKeysManagement() {
+            const session = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || adminToken || 'local-session';
+            const tbody = document.getElementById('page-keys-table-body');
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="p-8 text-center text-slate-400 dark:text-slate-500 font-sans">
+                        <div class="flex items-center justify-center gap-2">
+                            <span class="w-2 h-2 bg-qpay-blue dark:bg-sky-400 rounded-full animate-ping"></span>
+                            <span>Loading registered API keys from SQLite database...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/admin/keys`, {
+                    headers: { 'X-Admin-Session': session }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const keys = data.data || [];
+
+                    // Update KPI counters
+                    const statTotal = document.getElementById('keys-stat-total');
+                    if (statTotal) statTotal.innerText = keys.length;
+                    const activeCount = keys.filter(k => k.enabled).length;
+                    const statActive = document.getElementById('keys-stat-active');
+                    if (statActive) statActive.innerText = activeCount;
+
+                    if (keys.length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="p-8 text-center text-slate-400 dark:text-slate-500 font-sans">
+                                    No API keys created yet. Generate a new key using the form on the left!
+                                </td>
+                            </tr>
+                        `;
+                        return;
+                    }
+
+                    tbody.innerHTML = '';
+                    keys.forEach(k => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors';
+                        const statusBadge = k.enabled
+                            ? `<span class="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">ACTIVE</span>`
+                            : `<span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 text-[10px] font-bold">REVOKED</span>`;
+
+                        const modelsList = (k.allowed_models || []).map(m =>
+                            `<span class="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-qpay-blue dark:text-sky-400 border border-blue-200 dark:border-blue-800 text-[10px] mr-1">${m}</span>`
+                        ).join('');
+
+                        tr.innerHTML = `
+                            <td class="p-3 font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                <i data-lucide="key" class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500"></i>
+                                <span>${k.prefix}...</span>
+                            </td>
+                            <td class="p-3 text-slate-700 dark:text-slate-300 font-sans font-medium">${escapeHtml(k.name)}</td>
+                            <td class="p-3">${modelsList}</td>
+                            <td class="p-3 text-slate-700 dark:text-slate-300 font-bold">${k.rpm} RPM</td>
+                            <td class="p-3">${statusBadge}</td>
+                            <td class="p-3 text-right font-sans">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <button onclick="applyKeyPrefixToSession('${k.prefix}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold uppercase transition-colors" title="Use in current chat/playground session">
+                                        USE
+                                    </button>
+                                    ${k.enabled ? `
+                                        <button onclick="revokeKeyFromPage(${k.id})" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 text-[10px] font-bold uppercase transition-colors">
+                                            REVOKE
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    if (window.lucide) lucide.createIcons();
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="p-6 text-center text-slate-500 dark:text-slate-400 font-sans">
+                                ${data.detail || 'Failed to fetch API keys from gateway.'}
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (err) {
+                console.error('Keys fetch error:', err);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="p-6 text-center text-slate-500 dark:text-slate-400 font-sans">
+                            Unable to connect to Gateway API. Ensure gateway service is active on port 9000.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        async function createKeyFromPage() {
+            const session = localStorage.getItem('hpc_admin_session') || adminToken;
+            if (!session) {
+                showToast('Please sign in before generating an API key', 'error');
+                return;
+            }
+
+            const name = document.getElementById('page-key-name').value.trim() || 'qwen-client';
+            const rpm = parseInt(document.getElementById('page-key-rpm').value, 10) || 60;
+            const modelVal = document.getElementById('page-key-model').value;
+            const allowed_models = modelVal === '*' ? ['*'] : [modelVal];
+
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/admin/keys`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Admin-Session': session,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, allowed_models, rpm })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    lastCreatedRawKey = data.api_key;
+                    document.getElementById('page-issued-key-val').innerText = data.api_key;
+                    document.getElementById('page-issued-key-banner').classList.remove('hidden');
+                    showToast('New API key issued successfully!', 'success');
+                    fetchKeysManagement();
+                } else {
+                    showToast(data.detail || 'Error creating API key', 'error');
+                }
+            } catch (err) {
+                showToast('Network error while connecting to /admin/keys', 'error');
+            }
+        }
+
+        async function revokeKeyFromPage(keyId) {
+            const session = localStorage.getItem('hpc_admin_session') || adminToken;
+            if (!confirm(`Are you sure you want to revoke API Key ID #${keyId}? It will be immediately disabled.`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/admin/keys/${keyId}`, {
+                    method: 'DELETE',
+                    headers: { 'X-Admin-Session': session }
+                });
+                if (res.ok) {
+                    showToast(`Revoked Key #${keyId}`, 'info');
+                    fetchKeysManagement();
+                } else {
+                    const data = await res.json();
+                    showToast(data.detail || 'Error revoking API key', 'error');
+                }
+            } catch (err) {
+                showToast('Network error while revoking API key', 'error');
+            }
+        }
+
+        function copyGeneratedKey() {
+            if (!lastCreatedRawKey) return;
+            navigator.clipboard.writeText(lastCreatedRawKey).then(() => {
+                showToast('API Key copied to clipboard!', 'success');
+            });
+        }
+
+        function usePageIssuedKey() {
+            if (!lastCreatedRawKey) return;
+            activeApiKey = lastCreatedRawKey;
+            localStorage.setItem('hpc_llm_api_key', activeApiKey);
+            updateKeyDisplay();
+            showToast('Active session API Key updated!', 'success');
+        }
+
+        function applyKeyPrefixToSession(prefix) {
+            activeApiKey = prefix;
+            localStorage.setItem('hpc_llm_api_key', prefix);
+            updateKeyDisplay();
+            showToast(`Selected API Key prefix: ${prefix}`, 'info');
+        }
+
+        async function checkSystemHealth() {
+            const badge = document.getElementById('backend-status-badge');
+            const text = document.getElementById('backend-status-text');
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/health`, { method: 'GET' });
+                if (res.ok) {
+                    badge.className = 'flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-400 font-bold text-[11px]';
+                    text.innerText = 'ONLINE (SSH TUNNEL)';
+                } else {
+                    throw new Error('Not OK');
+                }
+            } catch (e) {
+                badge.className = 'flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 text-amber-700 dark:text-amber-400 font-bold text-[11px]';
+                text.innerText = 'GATEWAY READY (LOCAL)';
+            }
+        }
+
+        async function fetchModels() {
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/v1/models`, {
+                    headers: { 'Authorization': `Bearer ${activeApiKey}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.data && data.data.length > 0) {
+                        const select = document.getElementById('play-model-select');
+                        select.innerHTML = '';
+                        data.data.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m.id;
+                            opt.textContent = m.id;
+                            select.appendChild(opt);
+                        });
+                        document.getElementById('metric-model-name').innerText = data.data[0].id;
+                    }
+                }
+            } catch (e) {
+                console.debug('Models fetch offline');
+            }
+        }
+
+        // ==========================================
+        // SLURM CLUSTER & JOB MONITOR LOGIC
+        // ==========================================
+        async function fetchSlurmNodes() {
+            const tbody = document.getElementById('slurm-nodes-table-body');
+            if (!tbody) return;
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/api/slurm/nodes`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const nodes = data.nodes || [];
+                    document.getElementById('slurm-node-count').innerText = nodes.length;
+
+                    let idleCount = 0;
+                    let mixedCount = 0;
+                    let drainCount = 0;
+
+                    tbody.innerHTML = nodes.map(n => {
+                        const stateStr = (n.state || '').toLowerCase();
+                        let badgeClass = 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300';
+                        if (stateStr.includes('idle')) {
+                            badgeClass = 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400';
+                            idleCount++;
+                        } else if (stateStr.includes('mix')) {
+                            badgeClass = 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400';
+                            mixedCount++;
+                        } else if (stateStr.includes('drain') || stateStr.includes('down')) {
+                            badgeClass = 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400';
+                            drainCount++;
+                        } else if (stateStr.includes('alloc')) {
+                            badgeClass = 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-qpay-blue dark:text-sky-400';
+                        }
+
+                        let memDisplay = n.memory;
+                        const memNum = parseInt(n.memory, 10);
+                        if (!isNaN(memNum)) {
+                            memDisplay = `${(memNum / 1024).toFixed(0)} GB (${memNum.toLocaleString()} MB)`;
+                        }
+
+                        return `
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                <td class="p-3 font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                    <span class="w-1.5 h-1.5 ${stateStr.includes('idle') ? 'bg-emerald-500' : stateStr.includes('mix') ? 'bg-amber-500' : 'bg-rose-500'} rounded-full"></span>
+                                    <span>${n.node}</span>
+                                </td>
+                                <td class="p-3">
+                                    <span class="px-2 py-0.5 border font-bold text-[10px] uppercase ${badgeClass}">
+                                        ${n.state}
+                                    </span>
+                                </td>
+                                <td class="p-3 text-slate-700 dark:text-slate-300 font-code font-medium">${n.cpus}</td>
+                                <td class="p-3 text-slate-600 dark:text-slate-400">${memDisplay}</td>
+                                <td class="p-3 text-slate-800 dark:text-slate-200 font-bold font-code">${n.gres}</td>
+                                <td class="p-3 text-slate-600 dark:text-slate-400">${n.partition}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    document.getElementById('slurm-nodes-idle').innerText = `${idleCount} IDLE`;
+                    document.getElementById('slurm-nodes-mixed').innerText = `${mixedCount} MIXED`;
+                    document.getElementById('slurm-nodes-drain').innerText = `${drainCount} DRAIN`;
+                }
+            } catch (e) {
+                console.debug('Slurm nodes fetch offline');
+            }
+            lucide.createIcons();
+        }
+
+        async function fetchSlurmJobs() {
+            const tbody = document.getElementById('slurm-jobs-table-body');
+            if (!tbody) return;
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/api/slurm/jobs`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const jobs = data.jobs || [];
+                    document.getElementById('slurm-active-count').innerText = jobs.length;
+                    if (jobs.length > 0 && document.getElementById('slurm-active-node-badge')) {
+                        document.getElementById('slurm-active-node-badge').innerText = `Node: ${jobs[0].node}`;
+                    }
+
+                    if (jobs.length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="8" class="p-6 text-center text-slate-400 dark:text-slate-500 font-sans">
+                                    No active jobs in Slurm queue. Click <strong>LAUNCH VLLM SERVING JOB</strong> to start a worker!
+                                </td>
+                            </tr>
+                        `;
+                        return;
+                    }
+
+                    tbody.innerHTML = jobs.map(j => `
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <td class="p-3 font-bold text-slate-900 dark:text-slate-100">${j.job_id}</td>
+                            <td class="p-3 text-qpay-blue dark:text-sky-400 font-bold">${j.name}</td>
+                            <td class="p-3 text-slate-600 dark:text-slate-400">${j.partition}</td>
+                            <td class="p-3 text-slate-700 dark:text-slate-300">${j.node}</td>
+                            <td class="p-3 text-slate-700 dark:text-slate-300 font-medium">${j.gres}</td>
+                            <td class="p-3 text-slate-500 dark:text-slate-400">${j.time}</td>
+                            <td class="p-3">
+                                <span class="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">
+                                    ${j.status}
+                                </span>
+                            </td>
+                            <td class="p-3 text-right space-x-1">
+                                <button onclick="inspectSlurmJobLog('${j.job_id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] uppercase transition-colors">
+                                    INSPECT LOG
+                                </button>
+                                <button onclick="cancelSlurmJob('${j.job_id}')" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 font-bold text-[10px] uppercase transition-colors">
+                                    STOP / SCANCEL
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.debug('Slurm fetch offline');
+            }
+            lucide.createIcons();
+        }
+
+        function openSubmitJobModal() {
+            document.getElementById('modal-submit-job').classList.remove('hidden');
+        }
+
+        function closeSubmitJobModal() {
+            document.getElementById('modal-submit-job').classList.add('hidden');
+        }
+
+        async function submitSlurmJobAction() {
+            const model = document.getElementById('submit-job-model').value;
+            const partition = document.getElementById('submit-job-partition').value;
+            const gres = document.getElementById('submit-job-gres').value.trim() || 'gpu:1';
+            const time_limit = document.getElementById('submit-job-time').value.trim() || '04:00:00';
+            const tp = parseInt(document.getElementById('submit-job-tp').value, 10) || 1;
+
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/api/slurm/jobs/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model, partition, gres, time_limit, tp })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || `Submitted sbatch job ID #${data.job_id}`, 'success');
+                    closeSubmitJobModal();
+                    fetchSlurmJobs();
+                    fetchSlurmNodes();
+                } else {
+                    showToast(data.detail || 'Failed to submit sbatch job', 'error');
+                }
+            } catch (err) {
+                showToast('Network error connecting to Gateway /api/slurm/jobs/submit', 'error');
+            }
+        }
+
+        async function cancelSlurmJob(jobId) {
+            if (!confirm(`Are you sure you want to cancel Slurm job #${jobId}? (scancel ${jobId})`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/api/slurm/jobs/${jobId}/cancel`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || `Cancelled Slurm job #${jobId}`, 'info');
+                    fetchSlurmJobs();
+                    fetchSlurmNodes();
+                } else {
+                    showToast(data.detail || `Error cancelling Slurm job #${jobId}`, 'error');
+                }
+            } catch (err) {
+                showToast(`Network error calling scancel for job #${jobId}`, 'error');
+            }
+        }
+
+        async function inspectSlurmJobLog(jobId) {
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/api/slurm/logs/${jobId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const term = document.getElementById('slurm-log-terminal');
+                    document.getElementById('slurm-log-title').innerText = `LIVE SLURM JOB LOG (Job #${jobId})`;
+                    term.textContent = data.log || `[No log output for job ${jobId}]`;
+                    term.scrollTop = term.scrollHeight;
+                    showToast(`Fetched logs for Slurm job #${jobId}`, 'info');
+                }
+            } catch (err) {
+                showToast('Error fetching Slurm job log', 'error');
+            }
+        }
+
+        function refreshSlurmLogs() {
+            const activeId = document.getElementById('slurm-jobs-table-body')?.querySelector('tr td')?.innerText || '491823';
+            inspectSlurmJobLog(activeId.trim());
+        }
+
+        // ==========================================
+        // INFERENCE PLAYGROUND LOGIC
+        // ==========================================
+        function setPresetPrompt(text) {
+            document.getElementById('play-prompt').value = text;
+            document.getElementById('play-prompt').focus();
+        }
+
+        function toggleSystemPrompt() {
+            const el = document.getElementById('play-system-prompt');
+            el.classList.toggle('hidden');
+        }
+
+        async function executeInference() {
+            const prompt = document.getElementById('play-prompt').value.trim();
+            if (!prompt) {
+                showToast('Please enter a prompt to begin inference!', 'error');
+                return;
+            }
+
+            const model = document.getElementById('play-model-select').value;
+            const maxTokens = parseInt(document.getElementById('play-max-tokens').value, 10);
+            const temperature = parseFloat(document.getElementById('play-temperature').value);
+            const systemPrompt = document.getElementById('play-system-prompt').value.trim();
+            const outputEl = document.getElementById('play-output');
+            const runBtn = document.getElementById('send-infer-btn');
+            const stopBtn = document.getElementById('abort-infer-btn');
+
+            outputEl.textContent = '';
+            runBtn.classList.add('hidden');
+            stopBtn.classList.remove('hidden');
+
+            const startTime = performance.now();
+            let firstTokenTime = null;
+            let generatedTokenCount = 0;
+            let responseText = '';
+            const reqId = 'req_' + Math.random().toString(36).substring(2, 9);
+
+            abortController = new AbortController();
+
+            const messages = [];
+            if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+            messages.push({ role: 'user', content: prompt });
+
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/v1/chat/completions`, {
+                    method: 'POST',
+                    signal: abortController.signal,
+                    headers: {
+                        'Authorization': `Bearer ${activeApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: messages,
+                        temperature: temperature,
+                        max_tokens: maxTokens,
+                        stream: true
+                    })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({ error: { message: 'HTTP Error ' + res.status } }));
+                    throw new Error(errData.error?.message || 'Inference error');
+                }
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    if (!firstTokenTime) {
+                        firstTokenTime = performance.now();
+                        const ttft = (firstTokenTime - startTime).toFixed(0);
+                        document.getElementById('hud-ttft').innerText = `${ttft}ms`;
+                        document.getElementById('metric-ttft').innerText = `${ttft} ms`;
+                    }
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || !trimmed.startsWith('data:')) continue;
+                        const dataStr = trimmed.substring(5).trim();
+                        if (dataStr === '[DONE]') continue;
+
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            const chunk = parsed.choices?.[0]?.delta?.content || '';
+                            if (chunk) {
+                                responseText += chunk;
+                                outputEl.textContent = responseText;
+                                outputEl.scrollTop = outputEl.scrollHeight;
+                                generatedTokenCount++;
+                                document.getElementById('hud-tokens').innerText = generatedTokenCount;
+                            }
+                        } catch (err) { }
+                    }
+                }
+
+                const totalElapsed = (performance.now() - startTime) / 1000;
+                const tokPerSec = (generatedTokenCount / totalElapsed).toFixed(1);
+
+                document.getElementById('hud-time').innerText = `${totalElapsed.toFixed(2)}s`;
+                document.getElementById('metric-speed').innerText = tokPerSec;
+
+                totalRequests++;
+                totalTokens += generatedTokenCount;
+                document.getElementById('metric-total-requests').innerText = totalRequests;
+                document.getElementById('metric-total-tokens').innerText = totalTokens;
+
+                addLedgerRecord({
+                    id: reqId,
+                    model: model,
+                    tokens: generatedTokenCount,
+                    latency: (totalElapsed * 1000).toFixed(0),
+                    speed: tokPerSec,
+                    status: '200 OK',
+                    time: new Date().toLocaleTimeString()
+                });
+
+                showToast(`INFERENCE COMPLETED: ${generatedTokenCount} tokens @ ${tokPerSec} tok/s`, 'success');
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    outputEl.textContent += '\n\n[Inference aborted by user]';
+                    showToast('Inference aborted', 'info');
+                } else {
+                    outputEl.textContent = `Error: ${error.message}`;
+                    showToast(`ERROR: ${error.message}`, 'error');
+                    addLedgerRecord({
+                        id: reqId,
+                        model: model,
+                        tokens: 0,
+                        latency: '0',
+                        speed: '0',
+                        status: 'ERROR',
+                        time: new Date().toLocaleTimeString()
+                    });
+                }
+            } finally {
+                runBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
+                abortController = null;
+            }
+        }
+
+        function abortInference() {
+            if (abortController) abortController.abort();
+        }
+
+        function addLedgerRecord(rec) {
+            ledger.unshift(rec);
+            if (ledger.length > 50) ledger.pop();
+            renderLedger();
+        }
+
+        function renderLedger() {
+            const container = document.getElementById('tx-feed-container');
+            container.innerHTML = '';
+
+            const filtered = ledger.filter(item => {
+                if (activeFilter === '200') return item.status === '200 OK';
+                if (activeFilter === 'err') return item.status !== '200 OK';
+                return true;
+            });
+
+            document.getElementById('page-info-text').innerText = `SHOWING RECENT ${filtered.length} CALLS`;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="p-6 text-center text-slate-400 dark:text-slate-500 text-xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                        NO INFERENCE LOGS RECORDED YET
+                    </div>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const isSuccess = item.status === '200 OK';
+                const card = document.createElement('div');
+                card.className = 'p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-qpay-blue dark:hover:border-sky-400 transition-colors flex items-center justify-between text-xs';
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="w-1.5 h-8 ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}"></span>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-slate-900 dark:text-slate-100 font-code">${item.id}</span>
+                                <span class="px-1.5 py-0.2 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 font-code">${item.model}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                                ${item.time} • ${item.latency}ms • ${item.speed} tok/s
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right font-code">
+                        <span class="text-xs font-bold ${isSuccess ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">${item.status}</span>
+                        <span class="block text-[10px] text-slate-500 dark:text-slate-400">${item.tokens} tokens</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function filterLogs(type) {
+            activeFilter = type;
+            document.getElementById('filter-all-btn').className = type === 'all' ? 'px-2 py-1 bg-qpay-blue text-white font-bold' : 'px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 font-medium';
+            document.getElementById('filter-ok-btn').className = type === '200' ? 'px-2 py-1 bg-qpay-blue text-white font-bold' : 'px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 font-medium';
+            document.getElementById('filter-err-btn').className = type === 'err' ? 'px-2 py-1 bg-qpay-blue text-white font-bold' : 'px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 font-medium';
+            renderLedger();
+        }
+
+        function clearLedger() {
+            ledger = [];
+            renderLedger();
+            showToast('Ledger cleared', 'info');
+        }
+
+        // ==========================================
+        // AI CHATBOT WORKSPACE LOGIC
+        // ==========================================
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-user-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            input.value = '';
+            appendChatMessage('user', text);
+
+            const sysPrompt = document.getElementById('chat-system-prompt').value.trim();
+            const temp = parseFloat(document.getElementById('chat-temp').value);
+            const maxTokens = parseInt(document.getElementById('chat-tokens').value, 10);
+
+            const sendBtn = document.getElementById('chat-send-btn');
+            const stopBtn = document.getElementById('chat-stop-btn');
+            sendBtn.classList.add('hidden');
+            stopBtn.classList.remove('hidden');
+
+            const assistantBubble = appendChatMessage('assistant', '...');
+            let fullAssistantResponse = '';
+            let tokenCount = 0;
+            const startTime = performance.now();
+
+            chatAbortController = new AbortController();
+
+            const messagesPayload = [];
+            if (sysPrompt) messagesPayload.push({ role: 'system', content: sysPrompt });
+            conversationHistory.forEach(msg => messagesPayload.push(msg));
+
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/v1/chat/completions`, {
+                    method: 'POST',
+                    signal: chatAbortController.signal,
+                    headers: {
+                        'Authorization': `Bearer ${activeApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'qwen3.5-9b',
+                        messages: messagesPayload,
+                        temperature: temp,
+                        max_tokens: maxTokens,
+                        stream: true
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ error: { message: 'HTTP Error' } }));
+                    throw new Error(err.error?.message || 'Chat error');
+                }
+
+                assistantBubble.textContent = '';
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || !trimmed.startsWith('data:')) continue;
+                        const dataStr = trimmed.substring(5).trim();
+                        if (dataStr === '[DONE]') continue;
+
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            const chunk = parsed.choices?.[0]?.delta?.content || '';
+                            if (chunk) {
+                                fullAssistantResponse += chunk;
+                                assistantBubble.innerHTML = formatMarkdownText(fullAssistantResponse);
+                                tokenCount++;
+
+                                const elapsed = (performance.now() - startTime) / 1000;
+                                const speed = (tokenCount / elapsed).toFixed(1);
+                                document.getElementById('chat-live-speed').innerText = speed;
+
+                                const container = document.getElementById('chat-messages-container');
+                                container.scrollTop = container.scrollHeight;
+                            }
+                        } catch (e) { }
+                    }
+                }
+
+                conversationHistory.push({ role: 'assistant', content: fullAssistantResponse });
+
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    assistantBubble.innerHTML += '<br><em class="text-slate-400 dark:text-slate-500">[Response generation stopped]</em>';
+                } else {
+                    assistantBubble.innerHTML = `<span class="text-rose-600 dark:text-rose-400 font-bold">Error: ${err.message}</span>`;
+                }
+            } finally {
+                sendBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
+                chatAbortController = null;
+                lucide.createIcons();
+            }
+        }
+
+        function appendChatMessage(role, content) {
+            const container = document.getElementById('chat-messages-container');
+            const row = document.createElement('div');
+            row.className = 'flex items-start gap-3';
+
+            const isUser = role === 'user';
+            const avatar = isUser ? 'U' : 'Q';
+            const avatarBg = isUser ? 'bg-slate-700 dark:bg-slate-600' : 'bg-qpay-blue dark:bg-sky-600';
+            const bubbleBg = isUser ? 'bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60' : 'bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80';
+
+            row.innerHTML = `
+                <div class="w-7 h-7 ${avatarBg} text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+                    ${avatar}
+                </div>
+                <div class="p-4 ${bubbleBg} text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-2xl w-full markdown-body">
+                    ${isUser ? `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>` : formatMarkdownText(content)}
+                </div>
+            `;
+
+            container.appendChild(row);
+            container.scrollTop = container.scrollHeight;
+
+            if (isUser) {
+                conversationHistory.push({ role: 'user', content: content });
+            }
+
+            return row.querySelector('.markdown-body');
+        }
+
+        function stopChatStreaming() {
+            if (chatAbortController) chatAbortController.abort();
+        }
+
+        function clearChatHistory() {
+            conversationHistory = [];
+            const container = document.getElementById('chat-messages-container');
+            container.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <div class="w-7 h-7 bg-qpay-blue dark:bg-sky-600 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+                        Q
+                    </div>
+                    <div class="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-2xl w-full markdown-body">
+                        <p>Chat session cleared. You can start a new conversation!</p>
+                    </div>
+                </div>
+            `;
+            showToast('Chat history cleared', 'info');
+        }
+
+        function exportChatTranscript() {
+            if (conversationHistory.length === 0) {
+                showToast('No chat history to export', 'error');
+                return;
+            }
+            let text = '# V100-local Qwen 3.5 Chat Transcript\n\n';
+            conversationHistory.forEach(m => {
+                text += `### ${m.role.toUpperCase()}\n${m.content}\n\n`;
+            });
+            const blob = new Blob([text], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `qwen_chat_${Date.now()}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Chat exported as Markdown file', 'success');
+        }
+
+        // Configure Marked.js with custom Code Block Renderer & Highlight.js
+        if (typeof marked !== 'undefined') {
+            const renderer = new marked.Renderer();
+
+            renderer.code = function (code, lang) {
+                let codeText = '';
+                if (typeof code === 'object' && code.text !== undefined) {
+                    lang = code.lang || '';
+                    codeText = code.text;
+                } else {
+                    codeText = code || '';
+                }
+
+                const validLang = lang && hljs.getLanguage(lang) ? lang : '';
+                let highlighted = '';
+                try {
+                    highlighted = validLang
+                        ? hljs.highlight(codeText, { language: validLang, ignoreIllegals: true }).value
+                        : hljs.highlightAuto(codeText).value;
+                } catch (e) {
+                    highlighted = escapeHtml(codeText);
+                }
+
+                const displayLang = (validLang || 'CODE').toUpperCase();
+                const codeId = 'code_' + Math.random().toString(36).substring(2, 9);
+
+                return `
+                    <div class="code-wrapper not-prose">
+                        <div class="code-header">
+                            <span>${displayLang}</span>
+                            <button type="button" class="code-copy-btn" onclick="copyCodeBlock(this, '${codeId}')">
+                                <i data-lucide="copy" class="w-3 h-3"></i>
+                                <span>COPY</span>
+                            </button>
+                        </div>
+                        <pre><code id="${codeId}" class="hljs ${validLang}">${highlighted}</code></pre>
+                    </div>
+                `;
+            };
+
+            marked.setOptions({
+                renderer: renderer,
+                gfm: true,
+                breaks: true,
+                smartLists: true,
+                smartypants: true
+            });
+        }
+
+        function formatMarkdownText(str) {
+            if (!str) return '';
+            try {
+                if (typeof marked !== 'undefined') {
+                    return marked.parse(str);
+                }
+            } catch (e) {
+                console.error('Marked parsing error:', e);
+            }
+            return escapeHtml(str).replace(/\n/g, '<br>');
+        }
+
+        function copyCodeBlock(btn, codeId) {
+            const codeEl = document.getElementById(codeId);
+            if (!codeEl) return;
+            const text = codeEl.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = `<span class="text-emerald-400 font-bold">COPIED!</span>`;
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    lucide.createIcons();
+                }, 2000);
+            }).catch(() => {
+                showToast('Failed to copy code', 'error');
+            });
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        }
+
+        // ==========================================
+        // KEY & ADMIN MODAL CONTROLS
+        // ==========================================
+        function openKeyModal() {
+            document.getElementById('key-modal').classList.remove('hidden');
+        }
+
+        function closeKeyModal() {
+            document.getElementById('key-modal').classList.add('hidden');
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('input-api-key').value.trim();
+            if (key) {
+                activeApiKey = key;
+                localStorage.setItem('hpc_llm_api_key', key);
+                updateKeyDisplay();
+                fetchModels();
+                closeKeyModal();
+                showToast('API Key updated successfully', 'success');
+            }
+        }
+
+        function toggleAdminDrawer() {
+            const drawer = document.getElementById('admin-drawer');
+            drawer.classList.toggle('translate-x-full');
+            if (!drawer.classList.contains('translate-x-full')) {
+                fetchActiveKeys();
+            }
+        }
+
+        async function createNewApiKey() {
+            const adminTok = document.getElementById('admin-token-input').value.trim();
+            const name = document.getElementById('new-key-name').value.trim() || 'client';
+            const rpm = parseInt(document.getElementById('new-key-rpm').value, 10) || 60;
+            const model = document.getElementById('new-key-model').value.trim() || 'qwen3.5-9b';
+
+            if (!adminTok) {
+                showToast('Please enter an ADMIN_TOKEN!', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/admin/keys`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Admin-Token': adminTok,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        rpm: rpm,
+                        allowed_models: [model]
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('issued-key-val').innerText = data.api_key;
+                    document.getElementById('issued-key-banner').classList.remove('hidden');
+                    localStorage.setItem('hpc_admin_token', adminTok);
+                    showToast('Key generated successfully!', 'success');
+                    fetchActiveKeys();
+                } else {
+                    const err = await res.json().catch(() => ({ detail: 'Unauthorized' }));
+                    showToast(`Error: ${err.detail || 'Failed to create key'}`, 'error');
+                }
+            } catch (e) {
+                showToast('Cannot connect to Admin Gateway endpoint', 'error');
+            }
+        }
+
+        function useIssuedKey() {
+            const key = document.getElementById('issued-key-val').innerText;
+            if (key) {
+                activeApiKey = key;
+                localStorage.setItem('hpc_llm_api_key', key);
+                updateKeyDisplay();
+                showToast('Active API Key set to newly issued key', 'success');
+            }
+        }
+
+        async function fetchActiveKeys() {
+            const adminTok = document.getElementById('admin-token-input').value.trim() || adminToken;
+            if (!adminTok) return;
+
+            try {
+                const res = await fetch(`${GATEWAY_BASE}/admin/keys`, {
+                    headers: { 'X-Admin-Token': adminTok }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const listEl = document.getElementById('active-keys-list');
+                    listEl.innerHTML = '';
+                    (data.keys || []).forEach(k => {
+                        const item = document.createElement('div');
+                        item.className = 'p-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs font-code';
+                        item.innerHTML = `
+                            <div>
+                                <span class="font-bold text-slate-800 dark:text-slate-200">${k.name}</span>
+                                <span class="text-[10px] text-slate-400 dark:text-slate-500 block">${k.prefix}... (${k.rpm} RPM)</span>
+                            </div>
+                            <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">ENABLED</span>
+                        `;
+                        listEl.appendChild(item);
+                    });
+                }
+            } catch (e) {
+                console.debug('Admin keys offline');
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bg = type === 'success' ? 'bg-slate-900 dark:bg-slate-950 text-emerald-400 border-emerald-500' :
+                type === 'error' ? 'bg-slate-900 dark:bg-slate-950 text-rose-400 border-rose-500' :
+                    'bg-slate-900 dark:bg-slate-950 text-slate-100 border-slate-700';
+
+            toast.className = `px-4 py-3 border shadow-2xl text-xs font-bold tracking-tight pointer-events-auto transform transition-all duration-300 translate-y-2 opacity-0 flex items-center gap-2 ${bg}`;
+            toast.innerHTML = `
+                <span class="w-1.5 h-1.5 ${type === 'success' ? 'bg-emerald-400' : type === 'error' ? 'bg-rose-400' : 'bg-qpay-action'}"></span>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+
+</html>

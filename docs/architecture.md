@@ -1,96 +1,174 @@
 # Local HPC LLM Architecture Overview
 
-This document describes the high-level system architecture, design decisions, and component interactions for the **Local LLM** infrastructure and application stack.
+This document describes the high-level system architecture, design decisions, component interactions, and data flows for the **vLLMlocal** infrastructure and application stack.
 
 ---
 
 ## 1. System Architecture Diagram
 
-```
-+-----------------------------------------------------------------------------------+
-|                                  CLIENT LAYER                                     |
-|  +------------------------+      +------------------------+      +---------------+  |
-|  |  Python Client (SDK)   |      |   cURL / REST Clients  |      | Web Dashboard |  |
-|  +-----------+------------+      +-----------+------------+      +-------+-------+  |
-+--------------|-------------------------------|---------------------------|--------+
-               |                               |                           |
-               +-------------------------------+---------------------------+
-                                               |
-                                               v (HTTP http://127.0.0.1:9000/v1)
-+-----------------------------------------------------------------------------------+
-|                             APPLICATION LAYER (GATEWAY)                           |
-|  +-----------------------------------------------------------------------------+  |
-|  | FastAPI Gateway Proxy Server                                                 |  |
-|  |  - OpenAI-Compatible REST API (/v1/chat/completions, /v1/models, etc.)        |  |
-|  |  - API Key Authentication & Prefix Validation (sk-hpc-...)                  |  |
-|  |  - Model ACL & Rate Limiting (RPM tracking per key)                         |  |
-|  |  - SQLite Storage (SHA-256 key hashing, usage metrics)                       |  |
-|  |  - Web UI Admin Dashboard for key generation & management                   |  |
-|  +-------------------------------------+---------------------------------------+  |
-+----------------------------------------|------------------------------------------+
-                                         |
-                                         v (Forwarded to SSH Tunnel: 127.0.0.1:18000)
-+-----------------------------------------------------------------------------------+
-|                                 NETWORKING LAYER                                  |
-|  +-----------------------------------------------------------------------------+  |
-|  | SSH Local Port Forwarding Tunnel                                            |  |
-|  | 127.0.0.1:18000  ===>  HPC Compute Node (e.g., gpunode1.gitc.hpc:8000)        |  |
-|  +-------------------------------------+---------------------------------------+  |
-+----------------------------------------|------------------------------------------+
-                                         |
-                                         v (HTTP / Native IPC)
-+-----------------------------------------------------------------------------------+
-|                            INFRASTRUCTURE LAYER (HPC)                             |
-|                                                                                   |
-|  +-----------------------------------------------------------------------------+  |
-|  | Slurm Workload Manager                                                      |  |
-|  |  - Allocates compute nodes & GPU resources (NVIDIA V100/A100/H100)            |  |
-|  +-------------------------------------+---------------------------------------+  |
-|                                        |                                          |
-|  +-------------------------------------v---------------------------------------+  |
-|  | Apptainer / Singularity Container (vllm.sif)                                |  |
-|  |  - Pinned CUDA & vLLM Runtime (v0.8.5+)                                       |  |
-|  |  - Isolated PyTorch & FlashAttention environment                              |  |
-|  +-------------------------------------+---------------------------------------+  |
-|                                        |                                          |
-|  +-------------------------------------v---------------------------------------+  |
-|  | vLLM Serving Engine (Single-Node / Multi-Node Ray Cluster)                  |  |
-|  |  - Tensor Parallelism (TP=4) & Pipeline Parallelism (PP=2)                    |  |
-|  |  - High-throughput PagedAttention inference                                  |  |
-|  |  - Model Weights (Qwen2.5-32B, Qwen3-235B-GPTQ, etc.)                        |  |
-|  +-----------------------------------------------------------------------------+  |
-+-----------------------------------------------------------------------------------+
+```mermaid
+flowchart TB
+    subgraph ClientLayer ["Client Layer"]
+        SDK["Python SDK (openai)"]
+        REST["cURL / REST Clients"]
+        WEB["vLLMlocal Web Dashboard"]
+    end
+
+    subgraph AppLayer ["Application Layer (Local Gateway @ 127.0.0.1:9000)"]
+        direction TB
+        FASTAPI["FastAPI Gateway Proxy (main.py)"]
+        
+        subgraph SecurityModule ["Security & Governance"]
+            ADMIN_AUTH["Admin Auth (/api/auth/login)<br/>Session Tokens (7-day TTL)"]
+            KEY_ACL["API Key ACL & Sliding Window RPM<br/>SHA-256 Hashed in SQLite"]
+        end
+
+        subgraph TelemetryModule ["Observability & Metrics"]
+            SPEEDOMETER["Real-Time Speedometer (tok/s)"]
+            TTFT_TRACKER["Time To First Token (TTFT)"]
+            CHART_TS["Timeseries 1-min Buckets (Chart.js)"]
+        end
+
+        DB[("SQLite Database (gateway.db)<br/>api_keys & inference_logs")]
+        
+        FASTAPI --> SecurityModule
+        FASTAPI --> TelemetryModule
+        SecurityModule --> DB
+        TelemetryModule --> DB
+    end
+
+    subgraph NetworkLayer ["Networking Layer"]
+        TUNNEL["SSH Local Port Forwarding Tunnel<br/>127.0.0.1:18000 &rarr; gpunode1.gitc.hpc:8000"]
+    end
+
+    subgraph InfraLayer ["Infrastructure Layer (HPC Slurm Cluster)"]
+        SLURM["Slurm Workload Manager<br/>(vllm-singlegpu.sbatch)"]
+        CONTAINER["Apptainer Container Runtime<br/>(vllm.sif with VLLM_USE_V1=0)"]
+        VLLM_ENGINE["vLLM Serving Engine (TP=1)<br/>Model: Qwen3.5-9B-Q4_K_M.gguf (FP16)"]
+        GPU["1x NVIDIA Tesla V100 GPU (16GB VRAM)<br/>~5.8GB Weights | 64% KV Cache Free"]
+
+        SLURM --> CONTAINER
+        CONTAINER --> VLLM_ENGINE
+        VLLM_ENGINE --> GPU
+    end
+
+    ClientLayer -->|"HTTP /v1 (sk-hpc-...)"| FASTAPI
+    FASTAPI -->|"HTTP Reverse Proxy"| TUNNEL
+    TUNNEL -->|"HTTP Forwarding"| VLLM_ENGINE
 ```
 
 ---
 
-## 2. Key Components
+## 2. End-to-End Inference & Telemetry Sequence
 
-### 2.1 Infrastructure Layer (`infrastructure_layer/`)
-- **Apptainer Containerization (`defs/vllm.def`)**: Provides an isolated, reproducible container environment built on top of `vllm/vllm-openai`, configured for HPC cluster execution without root privileges.
-- **Slurm Integration (`slurm/`)**: Standardized batch job scripts for single-GPU, multi-GPU Tensor Parallelism (TP4), and multi-node Ray cluster orchestration (TP4 + PP2).
-- **Hugging Face Downloader (`slurm/download/`)**: Compute-node download scripts with hash verification and repair mechanisms to ensure zero GPU idle time during large model downloads.
+The sequence diagram below illustrates the lifecycle of a streaming request from the client, through the Gateway, down to the vLLM engine, including real-time TTFT and token generation speed measurement.
 
-### 2.2 Application Layer (`application_layer/`)
-- **FastAPI Gateway Proxy (`app/main.py`)**: A lightweight gateway serving an OpenAI-compatible API spec.
-- **Key & ACL Management**: Issues API keys formatted as `sk-hpc-...`. Raw keys are shown only once upon creation; only SHA-256 hashes are stored in SQLite (`gateway.db`).
-- **Rate Limiting & ACL**: Per-key Requests Per Minute (RPM) enforcement using in-memory sliding windows, and per-key model access control lists (ACL).
-- **Admin Dashboard**: Built-in HTML UI for token administration, key creation, usage monitoring, and key revocation.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Client / Web UI
+    participant GW as FastAPI Gateway (Port 9000)
+    participant DB as SQLite (gateway.db)
+    participant SSH as SSH Tunnel (Port 18000)
+    participant vLLM as vLLM Engine on V100 (Port 8000)
+
+    Client->>GW: POST /v1/chat/completions (Bearer sk-hpc-...)
+    
+    rect rgb(240, 245, 255)
+        Note over GW,DB: Authentication & Rate Limiting
+        GW->>DB: Query SHA-256(key_hash) & ACL
+        DB-->>GW: Key valid, RPM OK, Model Whitelisted
+    end
+
+    GW->>SSH: Forward payload to 127.0.0.1:18000
+    SSH->>vLLM: Proxy request to compute node:8000
+    
+    rect rgb(255, 248, 240)
+        Note over vLLM,GPU: vLLM PagedAttention Inference
+        vLLM-->>SSH: Stream Chunk 1 (First Token)
+        SSH-->>GW: Chunk 1 received
+        GW->>GW: Record TTFT (Time To First Token)
+        GW-->>Client: SSE data: {"choices": [{"delta": {"content": "..."}}]}
+    end
+
+    loop Token Generation Stream
+        vLLM-->>SSH: Stream Chunk N
+        SSH-->>GW: Chunk N received
+        GW->>GW: Increment completion token counter
+        GW-->>Client: SSE data: {"choices": [{"delta": {"content": "..."}}]}
+    end
+
+    vLLM-->>SSH: Stream [DONE]
+    SSH-->>GW: Stream closed
+
+    rect rgb(240, 255, 240)
+        Note over GW,DB: Telemetry Aggregation
+        GW->>GW: Calculate total_latency & tok/s throughput
+        GW->>DB: INSERT into inference_logs (req_id, tokens, latency, ttft, speed)
+    end
+    
+    GW-->>Client: SSE data: [DONE]
+```
 
 ---
 
-## 3. End-to-End Request Flow
+## 3. Administrator Authentication & API Key Lifecycle Flow
 
-1. **Request Initiation**: Client sends an OpenAI-compatible HTTP request (e.g. `POST /v1/chat/completions`) to `http://127.0.0.1:9000/v1` with `Authorization: Bearer sk-hpc-...`.
-2. **Gateway Processing**:
-   - Computes SHA-256 hash of key and verifies against SQLite database.
-   - Validates that the requested model is permitted under the key's ACL.
-   - Checks rate limits (RPM). If exceeded, returns `429 Too Many Requests`.
-3. **Upstream Forwarding**:
-   - Resolves model alias to backend URL from `config/models.json` (e.g., `http://127.0.0.1:18000/v1`).
-   - Streams or forwards HTTP payload through the local SSH tunnel to the active Slurm compute node running vLLM.
-4. **Inference Execution**:
-   - vLLM executes PagedAttention inference across allocated GPUs.
-   - Streams response tokens back to Gateway proxy.
-5. **Response Delivery**:
-   - Gateway passes streaming response (Server-Sent Events) back to client while logging request metrics.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Administrator
+    participant UI as Web Dashboard
+    participant GW as FastAPI Gateway
+    participant DB as SQLite (gateway.db)
+
+    Admin->>UI: Submit Username & Password
+    UI->>GW: POST /api/auth/login {username, password}
+    GW->>GW: Validate credentials vs .env
+    GW->>GW: Generate session token (sess_...) with 7-day TTL
+    GW-->>UI: 200 OK {token, username}
+    UI->>UI: Store session in localStorage
+
+    rect rgb(245, 245, 255)
+        Note over Admin,DB: Issue New Client API Key
+        Admin->>UI: Enter Client Name, RPM limit, Model
+        UI->>GW: POST /admin/keys (Header: X-Admin-Session)
+        GW->>GW: Validate session token
+        GW->>GW: Generate raw key (sk-hpc-...) & compute SHA-256 hash
+        GW->>DB: INSERT INTO api_keys (key_hash, prefix, name, rpm, allowed_models)
+        GW-->>UI: 200 OK {api_key: "sk-hpc-...", prefix, rpm}
+        UI->>Admin: Display raw secret once (1-Click Copy & Use)
+    end
+
+    rect rgb(255, 240, 240)
+        Note over Admin,DB: Key Revocation
+        Admin->>UI: Click REVOKE on Key #ID
+        UI->>GW: DELETE /admin/keys/{id} (Header: X-Admin-Session)
+        GW->>DB: UPDATE api_keys SET enabled = 0 WHERE id = {id}
+        GW-->>UI: 200 OK {revoked: true}
+        UI->>Admin: Update status badge to REVOKED
+    end
+```
+
+---
+
+## 4. Key Component Architecture
+
+### 4.1 Infrastructure Layer (`infra/`)
+- **Single-GPU Slurm Batch Job (`slurm/serving/vllm-singlegpu.sbatch`)**:
+  - Allocates `1` GPU (`#SBATCH --gres=gpu:1`), `4` CPUs, and `32GB` RAM.
+  - Launches vLLM with `TP=1`, `--dtype float16`, and `VLLM_USE_V1=0` on NVIDIA Tesla V100 (Volta SM70).
+- **Hugging Face Downloader (`slurm/download/hf_download_qwen9b_gguf.sbatch`)**:
+  - Automated downloader script that fetches quantized GGUF weights directly onto the shared scratch/lustre storage on compute nodes with automatic checksum verification.
+
+### 4.2 Application Layer (`app/`)
+- **FastAPI Gateway Proxy (`app/main.py`)**:
+  - OpenAI-compliant reverse proxy supporting streaming Server-Sent Events (SSE) and batch requests.
+  - Dual-tier authentication: Admin username/password session auth + Client `sk-hpc-...` bearer tokens.
+  - Granular rate limiting (Sliding Window RPM) and per-key model whitelisting.
+  - Live token dynamics metrics calculation (`tok/s`, TTFT, prompt & completion token counts).
+- **Web UI Dashboard (`ui/index.html`)**:
+  - **Inference Telemetry**: Dual-axis Chart.js token timeline, real-time speed meter, live inference audit ledger, and playground.
+  - **Slurm Jobs Monitor**: Cluster job queue inspection, node allocation, and live log reader.
+  - **AI Chatbot Studio**: Multi-turn chat interface with rich Markdown formatting, syntax highlighting, and 1-click code block copying.
+  - **API Key Governance**: Dedicated administration view for token issuance, rate limit configuration, and instant key revocation.
