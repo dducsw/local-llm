@@ -1836,54 +1836,56 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
 
         // Fetch Live Telemetry Data
         async function fetchRealtimeMetrics() {
+            const session = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || adminToken;
             try {
-                // 1. Realtime summary
-                const resSummary = await fetch(`${GATEWAY_BASE}/api/metrics/realtime`);
-                if (resSummary.ok) {
-                    const data = await resSummary.json();
-                    document.getElementById('metric-total-requests').innerText = data.total_requests || '0';
-                    document.getElementById('metric-total-tokens').innerText = (data.total_tokens || 0).toLocaleString();
+                const res = await fetch(`${GATEWAY_BASE}/admin/telemetry`, {
+                    headers: { 'X-Admin-Session': session }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    // 1. Realtime summary
+                    const stats = data.stats || {};
+                    document.getElementById('metric-total-requests').innerText = stats.total_requests || '0';
+                    document.getElementById('metric-total-tokens').innerText = (stats.total_tokens || 0).toLocaleString();
 
-                    if (data.current_tok_per_sec > 0) {
-                        document.getElementById('metric-speed').innerText = data.current_tok_per_sec;
-                        document.getElementById('stat-speed-label').innerText = `${data.current_tok_per_sec} tok/s`;
-                        const pct = Math.min(100, Math.round((data.current_tok_per_sec / 50) * 100));
+                    const metrics = data.current_metrics || {};
+                    if (metrics.speed > 0) {
+                        document.getElementById('metric-speed').innerText = metrics.speed;
+                        document.getElementById('stat-speed-label').innerText = `${metrics.speed} tok/s`;
+                        const pct = Math.min(100, Math.round((metrics.speed / 50) * 100));
                         document.getElementById('stat-speed-bar').style.width = `${pct}%`;
                     }
-                    if (data.last_ttft_ms > 0) {
-                        document.getElementById('metric-ttft').innerText = `${data.last_ttft_ms} ms`;
+                    if (metrics.ttft_ms > 0) {
+                        document.getElementById('metric-ttft').innerText = `${metrics.ttft_ms} ms`;
                     }
 
-                    document.getElementById('stat-prompt-tokens').innerText = (data.total_prompt_tokens || 0).toLocaleString();
-                    document.getElementById('stat-completion-tokens').innerText = (data.total_completion_tokens || 0).toLocaleString();
-                    document.getElementById('stat-total-tokens').innerText = (data.total_tokens || 0).toLocaleString();
+                    document.getElementById('stat-prompt-tokens').innerText = (stats.total_prompt || 0).toLocaleString();
+                    document.getElementById('stat-completion-tokens').innerText = (stats.total_completion || 0).toLocaleString();
+                    document.getElementById('stat-total-tokens').innerText = (stats.total_tokens || 0).toLocaleString();
 
-                    if (data.vram_used_gb) {
-                        document.getElementById('metric-vram-usage').innerText = `~${data.vram_used_gb}`;
-                    }
-                    if (data.model) {
-                        document.getElementById('metric-model-name').innerText = data.model;
-                    }
-                }
-
-                // 2. Timeseries chart data
-                const resTimeseries = await fetch(`${GATEWAY_BASE}/api/metrics/timeseries`);
-                if (resTimeseries.ok) {
-                    const ts = await resTimeseries.json();
-                    if (tokenChart && ts.labels && ts.labels.length > 0) {
-                        tokenChart.data.labels = ts.labels;
-                        tokenChart.data.datasets[0].data = ts.cumulative_tokens;
-                        tokenChart.data.datasets[1].data = ts.tokens_per_minute;
+                    // 2. Timeseries chart data
+                    const ts = data.timeseries || [];
+                    if (tokenChart && ts.length > 0) {
+                        tokenChart.data.labels = ts.map(t => {
+                            const d = new Date(t.timestamp * 1000);
+                            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                        });
+                        
+                        let cumulative = 0;
+                        tokenChart.data.datasets[0].data = ts.map(t => {
+                            cumulative += (t.prompt_tokens + t.completion_tokens);
+                            return cumulative;
+                        });
+                        
+                        tokenChart.data.datasets[1].data = ts.map(t => t.prompt_tokens + t.completion_tokens);
                         tokenChart.update('none');
                     }
-                }
 
-                // 3. Inference logs for audit ledger
-                const resLogs = await fetch(`${GATEWAY_BASE}/api/metrics/logs?limit=30`);
-                if (resLogs.ok) {
-                    const logsData = await resLogs.json();
-                    if (logsData.logs && logsData.logs.length > 0) {
-                        ledger = logsData.logs;
+                    // 3. Inference logs for audit ledger
+                    const logsData = data.recent_logs || [];
+                    if (logsData.length > 0 && typeof renderLedger === 'function') {
+                        ledger = logsData;
                         renderLedger();
                     }
                 }
@@ -2148,10 +2150,13 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
 
         // Slurm Cluster & Job Monitor Logic
         async function fetchSlurmNodes() {
+            const session = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || adminToken;
             const tbody = document.getElementById('slurm-nodes-table-body');
             if (!tbody) return;
             try {
-                const res = await fetch(`${GATEWAY_BASE}/api/slurm/nodes`);
+                const res = await fetch(`${GATEWAY_BASE}/admin/slurm/status`, {
+                    headers: { 'X-Admin-Session': session }
+                });
                 if (res.ok) {
                     const data = await res.json();
                     const nodes = data.nodes || [];
@@ -2213,10 +2218,13 @@ INFO [api_server.py] Server started on http://0.0.0.0:8000
         }
 
         async function fetchSlurmJobs() {
+            const session = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || adminToken;
             const tbody = document.getElementById('slurm-jobs-table-body');
             if (!tbody) return;
             try {
-                const res = await fetch(`${GATEWAY_BASE}/api/slurm/jobs`);
+                const res = await fetch(`${GATEWAY_BASE}/admin/slurm/status`, {
+                    headers: { 'X-Admin-Session': session }
+                });
                 if (res.ok) {
                     const data = await res.json();
                     const jobs = data.jobs || [];

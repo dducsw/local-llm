@@ -486,6 +486,130 @@ def revoke_key(key_id: int):
     return {"id": key_id, "revoked": True}
 
 
+@app.get("/admin/telemetry", dependencies=[Depends(require_admin)])
+def get_telemetry():
+    with db() as conn:
+        # Get overall stats
+        stats = conn.execute(
+            """
+            SELECT 
+                COUNT(*) as total_requests,
+                SUM(prompt_tokens) as total_prompt,
+                SUM(completion_tokens) as total_completion,
+                SUM(total_tokens) as total_tokens
+            FROM inference_logs
+            """
+        ).fetchone()
+
+        # Get timeseries for the last 15 minutes (grouped by minute)
+        fifteen_mins_ago = int(time.time()) - (15 * 60)
+        ts_rows = conn.execute(
+            """
+            SELECT 
+                (created_at / 60) * 60 as minute_ts,
+                SUM(prompt_tokens) as p_toks,
+                SUM(completion_tokens) as c_toks
+            FROM inference_logs
+            WHERE created_at >= ?
+            GROUP BY minute_ts
+            ORDER BY minute_ts ASC
+            """,
+            (fifteen_mins_ago,)
+        ).fetchall()
+
+        timeseries = [
+            {
+                "timestamp": r["minute_ts"],
+                "prompt_tokens": r["p_toks"] or 0,
+                "completion_tokens": r["c_toks"] or 0
+            }
+            for r in ts_rows
+        ]
+
+    # Calculate current speed and TTFT based on recent logs in memory (last 200)
+    current_speed = 0.0
+    current_ttft = 0.0
+    valid_speeds = [l["tok_per_sec"] for l in RECENT_LOGS if l.get("tok_per_sec", 0) > 0]
+    valid_ttfts = [l["ttft_ms"] for l in RECENT_LOGS if l.get("ttft_ms")]
+    
+    if valid_speeds:
+        current_speed = sum(valid_speeds) / len(valid_speeds)
+    if valid_ttfts:
+        current_ttft = sum(valid_ttfts) / len(valid_ttfts)
+
+    return {
+        "stats": {
+            "total_requests": stats["total_requests"] or 0,
+            "total_prompt": stats["total_prompt"] or 0,
+            "total_completion": stats["total_completion"] or 0,
+            "total_tokens": stats["total_tokens"] or 0,
+        },
+        "current_metrics": {
+            "speed": round(current_speed, 1),
+            "ttft_ms": round(current_ttft, 1)
+        },
+        "timeseries": timeseries,
+        "recent_logs": list(RECENT_LOGS)[:20]
+    }
+
+
+@app.get("/admin/slurm/status", dependencies=[Depends(require_admin)])
+def get_slurm_status():
+    # MOCK DATA for Slurm Jobs
+    return {
+        "status": "mock",
+        "message": "SSH Key not configured. Showing mock data.",
+        "nodes": [
+            {
+                "node": "gpunode1",
+                "state": "MIXED",
+                "cpus": "32",
+                "memory": "128000",
+                "gres": "gpu:v100:1",
+                "partition": "gpu-v100"
+            },
+            {
+                "node": "gpunode2",
+                "state": "IDLE",
+                "cpus": "32",
+                "memory": "128000",
+                "gres": "gpu:v100:1",
+                "partition": "gpu-v100"
+            },
+            {
+                "node": "cpunode4",
+                "state": "ALLOCATED",
+                "cpus": "64",
+                "memory": "256000",
+                "gres": "(null)",
+                "partition": "cpu-queue"
+            }
+        ],
+        "jobs": [
+            {
+                "job_id": "100234",
+                "name": "vllm-serve",
+                "user": "hpc_user",
+                "partition": "gpu-v100",
+                "node": "gpunode1",
+                "gres": "gpu:v100:1",
+                "status": "RUNNING",
+                "time": "4:32:10"
+            },
+            {
+                "job_id": "100235",
+                "name": "hf_download",
+                "user": "hpc_user",
+                "partition": "cpu-queue",
+                "node": "cpunode4",
+                "gres": "(null)",
+                "status": "COMPLETED",
+                "time": "0:45:12"
+            }
+        ]
+    }
+
+
 @app.get("/v1/models")
 def models(identity: Identity = Depends(require_api_key)):
     data = []
