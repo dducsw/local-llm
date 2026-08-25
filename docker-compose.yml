@@ -29,8 +29,9 @@ services:
       - ./app/config:/workspace/app/config
       # Live UI hot-reload without container rebuild
       - ./app/ui:/workspace/app/ui
-      # Optional: To enable SSH without mounting whole ~/.ssh, mount only a dedicated key:
-      # - ./secrets/id_rsa:/root/.ssh/id_rsa:ro
+
+    secrets:
+      - hpc_ssh_key
 
     # Prevent runaway container log files on disk
     logging:
@@ -41,3 +42,7 @@ services:
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+secrets:
+  hpc_ssh_key:
+    file: ${HPC_HOST_SSH_KEY:-/root/.ssh/id_ed25519}

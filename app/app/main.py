@@ -1147,6 +1147,8 @@ async def get_gpu_telemetry():
 HPC_SSH_HOST = os.getenv("HPC_SSH_HOST", "")
 HPC_SSH_USER = os.getenv("HPC_SSH_USER", "")
 HPC_SSH_KEY = os.getenv("HPC_SSH_KEY", "")
+if not HPC_SSH_KEY and os.path.exists("/run/secrets/hpc_ssh_key"):
+    HPC_SSH_KEY = "/run/secrets/hpc_ssh_key"
 HPC_REMOTE_DIR = os.getenv("HPC_REMOTE_DIR", "~/local-llm/infra")
 
 

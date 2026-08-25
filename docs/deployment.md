@@ -13,14 +13,46 @@ Below is the detailed deployment workflow based on the project's structure:
 Perform these steps on the HPC Login Node (or Build Node).
 
 ### 1.1. Build the Apptainer Container for vLLM
-Since HPC environments usually prohibit direct Docker usage (which requires root privileges), the system uses Apptainer (Singularity). Build the `.sif` image from the provided definition file:
+Since HPC environments usually prohibit direct Docker usage (which requires root privileges), the system uses Apptainer (Singularity). You can build either a standalone `.sif` image or an editable `--sandbox` directory.
 
+#### Option A: Build Standalone SIF Image (Production)
 ```bash
 cd infra
 mkdir -p build
 apptainer build build/vllm.sif defs/vllm.def
 ```
-*Note: This image is optimized for V100 (Volta SM70) GPUs.*
+
+#### Option B: Build Editable Sandbox (`--sandbox`) (Recommended for Development & Patching)
+A sandbox directory extracts the root filesystem into a folder instead of an immutable `.sif` file. This allows you to hot-patch libraries, install additional Python packages, or debug without rebuilding the entire multi-gigabyte container image from scratch:
+
+```bash
+cd infra
+mkdir -p build
+
+# 1. Build sandbox directly from definition file:
+apptainer build --sandbox build/vllm.sandbox defs/vllm.def
+
+# (Or convert an existing .sif image into a sandbox):
+# apptainer build --sandbox build/vllm.sandbox build/vllm.sif
+```
+
+**Modifying & Testing within the Sandbox:**
+```bash
+# Enter sandbox with write permissions (to install wheels, modify vLLM/PyTorch source):
+apptainer shell --writable --fakeroot build/vllm.sandbox
+
+# Example: Reinstall custom patched torch/nccl wheel inside sandbox
+# pip install --no-cache-dir --force-reinstall /path/to/custom_wheel.whl
+
+# Test running directly against the sandbox:
+apptainer run --nv build/vllm.sandbox python3 -m vllm.entrypoints.openai.api_server --help
+```
+
+**Exporting Sandbox back to SIF (When Stable):**
+```bash
+apptainer build build/vllm-final.sif build/vllm.sandbox
+```
+*Note: Both `.sif` and `.sandbox` can be referenced directly in Slurm job scripts (`vllm-singlegpu.sbatch`).*
 
 ### 1.2. Download the Model (GGUF Quantized)
 Instead of downloading directly on the login node (which might be limited in bandwidth or resources), submit a Slurm job to handle the download:
@@ -58,20 +90,22 @@ sbatch slurm/serving/vllm-singlegpu.sbatch
 
 Switch to the **VM (Gateway)** machine. You need to open an SSH Tunnel connecting directly to the Compute Node (e.g., `gpunode1.gitc.hpc`) via the HPC Login Node.
 
-### 3.1. Configure Passwordless SSH (Required)
-To allow the Gateway (and Slurm monitoring scripts) to connect automatically without prompting for a password, generate an SSH key on the VM and copy it to the HPC Login Node:
+### 3.1. Configure Dedicated SSH Key for Slurm Supervision (Best Practice)
+To allow the Gateway to query Slurm cluster status (`squeue`, `sbatch`, GPU telemetry) without prompting for passwords:
 
-```bash
-# 1. Generate SSH Key on the VM (if you haven't already)
-ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
+1. Generate a dedicated SSH key pair on the VM (keeping it separate from your personal keys):
+   ```bash
+   ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 -C "v100-slurm-gateway"
+   ```
 
-# 2. Copy the public key to the HPC Login Node
-ssh-copy-id hpc_user@hpc-login.gitc
-```
-*(Replace `hpc_user@hpc-login.gitc` with your actual HPC SSH login credentials. You will be prompted for your HPC password once).*
+2. Copy the public key to the HPC Login Node:
+   ```bash
+   ssh-copy-id -i ~/.ssh/id_ed25519.pub hpc_user@hpc-login.gitc
+   ```
+   *(Optional hardening on HPC: In `~/.ssh/authorized_keys`, add `from="<VM_IP>",no-port-forwarding` before the key).*
 
 ### 3.2. Start the SSH Tunnel
-The project provides a utility script to establish the tunnel:
+The project provides a utility script to establish the tunnel for inference traffic:
 
 ```bash
 cd app
@@ -102,25 +136,38 @@ Edit `app/config/models.json` and set the `base_url` to point to the tunneled po
 }
 ```
 
-### 4.2. Initialize `.env`
-Create or modify the `.env` file in the root directory to configure a secure Admin password:
-
-```env
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your_super_secret_password
-```
-
-### 4.3. Launch the Gateway
-Start the system using Docker Compose (or the `run.sh` script if running natively):
+### 4.2. Initialize `.env` & Docker Secrets Configuration
+Copy the template `.env.example` to `.env` and fill in your details:
 
 ```bash
-# Using Docker Compose:
-docker-compose up -d
-
-# OR natively using the script:
-cd app
-./scripts/run.sh
+cp .env.example .env
 ```
+
+Key environment parameters:
+```env
+# 1. Administrator Dashboard Credentials
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your_super_secret_password
+ADMIN_TOKEN=your_super_secret_admin_token
+
+# 2. HPC Supervision Settings (Secured via Docker Secrets)
+HPC_SSH_HOST=hpc-login.gitc
+HPC_SSH_USER=hpc_user
+HPC_HOST_SSH_KEY=/root/.ssh/id_ed25519
+HPC_SSH_KEY=/run/secrets/hpc_ssh_key
+HPC_REMOTE_DIR=~/local-llm/infra
+```
+
+> [!TIP]
+> **Security Note:** Instead of mounting the entire `~/.ssh` directory into the container (which risks leaking all host private keys), `docker-compose.yml` uses **Docker Secrets** (`secrets: [hpc_ssh_key]`). Only the designated key is mounted read-only into `/run/secrets/hpc_ssh_key`.
+
+### 4.3. Launch the Gateway
+Start the system using Docker Compose:
+
+```bash
+docker compose up -d --build
+```
+*(Or natively using `./scripts/run.sh` inside the `app/` directory if not running in Docker).*
 
 ---
 
