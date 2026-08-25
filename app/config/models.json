@@ -4,8 +4,8 @@
       "id": "qwen3.5-9b",
       "owned_by": "hpc-selfhosted",
       "base_url": "http://127.0.0.1:18000/v1",
-      "upstream_model": "Qwen3.5-9B-Q4_K_M.gguf",
-      "api_key": ""
+      "upstream_model": "qwen3.5-9b",
+      "api_key": "dacn-qwen-3.5-9b-secret-key"
     }
   ]
 }

@@ -4,19 +4,29 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
-#SBATCH --qos=gpu-q
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=12G
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 #SBATCH --output=logs/vllm-%j.out
 #SBATCH --error=logs/vllm-%j.err
 #SBATCH --signal=B:SIGTERM@60
 
 set -euo pipefail
 
-# Override these from sbatch --export=ALL,IMAGE=...,MODEL=...,CACHE_ROOT=...
-IMAGE=${IMAGE:-$PWD/build/vllm.sif}
+# Override these from sbatch --export=ALL,IMAGE=...,MODEL=...,CACHE_ROOT=...,MODELS_DIR=...
+if [[ -f "$PWD/build/vllm.sif" ]]; then
+  DEFAULT_IMAGE="$PWD/build/vllm.sif"
+elif [[ -d "$PWD/build/vllm" ]]; then
+  DEFAULT_IMAGE="$PWD/build/vllm"
+elif [[ -d "$PWD/build/vllm_sandbox" ]]; then
+  DEFAULT_IMAGE="$PWD/build/vllm_sandbox"
+else
+  DEFAULT_IMAGE="$PWD/build/vllm.sif"
+fi
+
+IMAGE=${IMAGE:-$DEFAULT_IMAGE}
 MODEL=${MODEL:-Qwen3.5-9B-Q4_K_M.gguf}
+MODELS_DIR=${MODELS_DIR:-$PWD/../models}
 CACHE_ROOT=${CACHE_ROOT:-${SCRATCH:-$HOME/.cache}/llm-serving}
 PORT=${PORT:-8000}
 TP=${TP:-1}
@@ -70,12 +80,28 @@ fi
 export VLLM_USE_V1=0
 export NVIDIA_TF32_OVERRIDE=0
 
-# Resolve GGUF model path if stored in cache or local directory
+# Resolve model location and bind mounts
+BIND_ARGS=("--bind" "$CACHE_ROOT:/cache")
 MODEL_ARG="$MODEL"
-if [[ -f "$CACHE_ROOT/models/$MODEL" ]]; then
+
+if [[ -f "$MODEL" ]]; then
+  MODEL_DIR=$(dirname "$(realpath "$MODEL")")
+  MODEL_BASE=$(basename "$MODEL")
+  BIND_ARGS+=("--bind" "$MODEL_DIR:/models:ro")
+  MODEL_ARG="/models/$MODEL_BASE"
+elif [[ -n "${MODELS_DIR:-}" && -f "$MODELS_DIR/$MODEL" ]]; then
+  ABS_MODELS_DIR=$(realpath "$MODELS_DIR")
+  BIND_ARGS+=("--bind" "$ABS_MODELS_DIR:/models:ro")
+  MODEL_ARG="/models/$MODEL"
+elif [[ -f "$HOME/dev/models/$MODEL" ]]; then
+  BIND_ARGS+=("--bind" "$HOME/dev/models:/models:ro")
+  MODEL_ARG="/models/$MODEL"
+elif [[ -f "$PWD/../../models/$MODEL" ]]; then
+  ABS_DIR=$(realpath "$PWD/../../models")
+  BIND_ARGS+=("--bind" "$ABS_DIR:/models:ro")
+  MODEL_ARG="/models/$MODEL"
+elif [[ -f "$CACHE_ROOT/models/$MODEL" ]]; then
   MODEL_ARG="/cache/models/$MODEL"
-elif [[ -f "$MODEL" ]]; then
-  MODEL_ARG="$MODEL"
 fi
 
 TOKENIZER_ARGS=()
@@ -83,9 +109,11 @@ if [[ "$MODEL" == *.gguf* ]] && [[ -n "${TOKENIZER:-}" ]]; then
   TOKENIZER_ARGS=(--tokenizer "$TOKENIZER")
 fi
 
+echo "Resolved model path in container: $MODEL_ARG"
+
 # Run vLLM serving with FP16 KV Cache, Prefix Caching and Chunked Prefill
 "${NUMA_PREFIX[@]}" apptainer run --nv --cleanenv \
-  --bind "$CACHE_ROOT:/cache" \
+  "${BIND_ARGS[@]}" \
   "$IMAGE" \
   serve "$MODEL_ARG" \
   "${TOKENIZER_ARGS[@]}" \

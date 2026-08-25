@@ -22,8 +22,9 @@ HPC_HOST="${GPU_HOST:-${HPC_SSH_HOST:-}}"
 HPC_USER="${GPU_USER:-${HPC_SSH_USER:-}}"
 SSH_KEY="${SSH_KEY:-${HPC_HOST_SSH_KEY:-${HPC_SSH_KEY:-}}}"
 JUMP_HOST="${JUMP_HOST:-}"
+NODE="${NODE:-${TARGET_NODE:-127.0.0.1}}"
 LOCAL_PORT="${LOCAL_PORT:-18000}"
-REMOTE_PORT="${REMOTE_PORT:-8000}"
+REMOTE_PORT="${REMOTE_PORT:-18000}"
 
 # 3. Validation
 if [[ -z "$HPC_HOST" ]]; then
@@ -47,24 +48,25 @@ fi
 echo "=================================================="
 echo " Starting SSH Tunnel for vLLM AI Gateway"
 echo "=================================================="
-echo "  Local Port:   localhost:${LOCAL_PORT}"
+echo "  Local Listen:   0.0.0.0:${LOCAL_PORT}"
 if [[ -n "$JUMP_HOST" ]]; then
-  echo "  Jump Host:    ${JUMP_HOST}"
+  echo "  Jump Host:     ${JUMP_HOST}"
 fi
-echo "  Remote Host:  ${TARGET_HOST}"
-echo "  Remote Port:  localhost:${REMOTE_PORT}"
+echo "  Remote Host:   ${TARGET_HOST}"
+echo "  Remote Port:   ${REMOTE_PORT}"
 if [[ -n "$SSH_KEY" ]]; then
-  echo "  SSH Key:      ${SSH_KEY}"
+  echo "  SSH Key:       ${SSH_KEY}"
 fi
 echo "=================================================="
 
 # 3. Build SSH options
 SSH_OPTS=(
   -N
+  -g
   -o ExitOnForwardFailure=yes
   -o ServerAliveInterval=60
   -o ServerAliveCountMax=3
-  -L "${LOCAL_PORT}:127.0.0.1:${REMOTE_PORT}"
+  -L "0.0.0.0:${LOCAL_PORT}:127.0.0.1:${REMOTE_PORT}"
 )
 
 # Expand ~ in SSH_KEY path for test

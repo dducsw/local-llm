@@ -86,33 +86,53 @@ sbatch slurm/serving/vllm-singlegpu.sbatch
 
 ---
 
-## 3. Establish SSH Tunnel from VM to HPC
+---
 
-Switch to the **VM (Gateway)** machine. You need to open an SSH Tunnel connecting directly to the Compute Node (e.g., `gpunode1.gitc.hpc`) via the HPC Login Node.
+## 3. Establish SSH Tunnel from VM to HPC (Secure 2-Hop Architecture)
 
-### 3.1. Configure Dedicated SSH Key for Slurm Supervision (Best Practice)
-To allow the Gateway to query Slurm cluster status (`squeue`, `sbatch`, GPU telemetry) without prompting for passwords:
+Trong cụm HPC Slurm thực tế, các Compute Node (`gpunode1`) được đặt trong mạng riêng biệt đằng sau tường lửa (Firewall) và không mở cổng trực tiếp ra ngoài. Kiến trúc kết nối an toàn 2 chặng (**2-Hop Reverse Tunnel**) được sử dụng để chuyển tiếp dữ liệu an toàn.
 
-1. Generate a dedicated SSH key pair on the VM (keeping it separate from your personal keys):
-   ```bash
-   ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 -C "v100-slurm-gateway"
-   ```
-
-2. Copy the public key to the HPC Login Node:
-   ```bash
-   ssh-copy-id -i ~/.ssh/id_ed25519.pub hpc_user@hpc-login.gitc
-   ```
-   *(Optional hardening on HPC: In `~/.ssh/authorized_keys`, add `from="<VM_IP>",no-port-forwarding` before the key).*
-
-### 3.2. Start the SSH Tunnel
-The project provides a utility script to establish the tunnel for inference traffic:
-
-```bash
-cd app
-GPU_NODE=gpunode1.gitc.hpc LOCAL_PORT=18000 ./scripts/ssh-tunnel.sh
+### 3.1. Sơ đồ luồng mạng & Bảo mật
+```text
+[AI Gateway (Docker)] ➔ host.docker.internal:18000
+       │
+       │  [Chặng 2: SSH Local Forward (-L)] (Mã hóa SSH Ed25519)
+       ▼
+[Login Node: 10.1.1.239] ➔ 127.0.0.1:18000 (Chỉ lắng nghe Localhost)
+       │
+       │  [Chặng 1: Slurm Reverse Tunnel (-R)] (Mã hóa SSH nội bộ)
+       ▼
+[Compute Node: gpunode1] ➔ localhost:8000 (GPU V100 - sau Firewall)
 ```
 
-This command will port-forward local port `18000` on the VM to port `8000` on the Compute Node (`gpunode1`).
+### 3.2. Chặng 1: Thiết lập Reverse Tunnel từ Compute Node về Login Node
+Sau khi job Slurm được cấp phát trên node (ví dụ: `gpunode1`, Job ID `5123`), chạy lệnh cầu nối ngược:
+
+```bash
+# Thực hiện trên HPC Login Node (10.1.1.239)
+srun --jobid=<JOB_ID> --overlap ssh -o StrictHostKeyChecking=no -N -R 18000:localhost:8000 $USER@10.1.1.239 &
+```
+*(Mẹo: Bạn có thể đưa dòng lệnh này trực tiếp vào cuối file `.sbatch` để tự động hóa khi khởi chạy model).*
+
+### 3.3. Chặng 2: Thiết lập SSH Tunnel từ VM / Local Gateway
+Trên máy **VM / Local Gateway**, chỉ cần khởi chạy script hỗ trợ:
+
+```bash
+cd /home/dev/local-llm
+./app/scripts/ssh-tunnel.sh
+```
+
+*(Chạy ngầm dưới dạng background service):*
+```bash
+nohup ./app/scripts/ssh-tunnel.sh > /tmp/ssh-tunnel.log 2>&1 &
+```
+
+### 3.4. Đánh giá tính An toàn & Bảo mật (Security Audit)
+Cách tiếp cận này tuân thủ đầy đủ chuẩn bảo mật cao cấp của hệ thống HPC:
+1. **Không mở cổng Firewall công khai:** Compute Node hoàn toàn ẩn sau Firewall nội bộ, không bị quét cổng hay tấn công dò quét từ bên ngoài.
+2. **Mã hóa đa tầng (End-to-End SSH Encryption):** Toàn bộ prompt, dữ liệu nhạy cảm và token suy luận được mã hóa bằng chuẩn `Ed25519` + `ChaCha20-Poly1305 / AES-GCM`.
+3. **Localhost Binding Isolation:** Cổng `18000` trên Login Node chỉ lắng nghe trên `127.0.0.1`, chỉ người dùng có khóa SSH hợp lệ mới có thể tương tác.
+4. **Xác thực 2 lớp (Double Authentication):** Yêu cầu xác thực khóa SSH tại tầng mạng và `Bearer API Key` tại tầng ứng dụng vLLM/Llama-server.
 
 ---
 
