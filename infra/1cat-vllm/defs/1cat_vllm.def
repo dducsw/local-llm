@@ -1,0 +1,103 @@
+Bootstrap: docker
+From: nvidia/cuda:12.8.0-devel-ubuntu24.04
+
+%labels
+    org.opencontainers.image.title "1Cat-vLLM for NVIDIA Volta / V100"
+    org.opencontainers.image.description "vLLM fork for Tesla V100 (SM70) with FLASH_ATTN_V100 and TurboMind AWQ support"
+    benchmark.engine "1cat-vllm"
+    benchmark.gpu_profile "volta-sm70"
+    cuda.version "12.8"
+    python.version "3.12"
+
+%environment
+    # Standard cache & storage directory layout for immutable SIFs
+    export HF_HOME=/cache/huggingface
+    export HUGGINGFACE_HUB_CACHE=/cache/huggingface/hub
+    export TRANSFORMERS_CACHE=/cache/huggingface/hub
+    export VLLM_CACHE_ROOT=/cache/vllm
+    export XDG_CACHE_HOME=/cache/xdg
+    export TOKENIZERS_PARALLELISM=true
+
+    # Volta SM70 execution parameters
+    export VLLM_USE_V1=0
+    export NVIDIA_TF32_OVERRIDE=0
+    export NCCL_P2P_DISABLE=1
+
+    # Python environment in container
+    export PATH=/opt/venv/bin:$PATH
+    export CUDA_HOME=/usr/local/cuda-12.8
+    export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:${LD_LIBRARY_PATH:-}
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update && apt-get install -y --no-install-recommends \
+        python3.12 \
+        python3.12-venv \
+        python3.12-dev \
+        python3-pip \
+        git \
+        git-lfs \
+        curl \
+        wget \
+        numactl \
+        ca-certificates \
+        && rm -rf /var/lib/apt/lists/*
+
+    mkdir -p /models /cache/huggingface/hub /cache/vllm /cache/xdg
+    python3.12 -m venv /opt/venv
+    export PATH=/opt/venv/bin:$PATH
+
+    pip install --upgrade pip setuptools wheel
+
+    # Install PyTorch with CUDA 12.8 runtime
+    pip install --prefer-binary --no-cache-dir \
+        torch torchvision torchaudio \
+        --index-url https://download.pytorch.org/whl/cu128
+
+    # Install utility dependencies
+    pip install --no-cache-dir huggingface-hub hf-transfer openai
+
+    # Fetch and install latest 1Cat-vLLM wheel from GitHub releases
+    LATEST_WHEEL_URL=$(curl -s https://api.github.com/repos/1CatAI/1Cat-vLLM/releases/latest | \
+        grep "browser_download_url.*\.whl" | head -n 1 | cut -d '"' -f 4 || true)
+
+    if [ -n "$LATEST_WHEEL_URL" ]; then
+        echo "Fetching wheel: $LATEST_WHEEL_URL"
+        curl -L "$LATEST_WHEEL_URL" -o /tmp/1cat_vllm.whl
+        pip install --prefer-binary --no-cache-dir \
+            --extra-index-url https://download.pytorch.org/whl/cu128 \
+            /tmp/1cat_vllm.whl
+        rm -f /tmp/1cat_vllm.whl
+    else
+        echo "Warning: Could not automatically fetch 1Cat-vLLM wheel via GitHub API."
+    fi
+
+%test
+    export PATH=/opt/venv/bin:$PATH
+    python3 - <<'PY'
+import torch
+print("PyTorch:", torch.__version__, "| CUDA available:", torch.cuda.is_available())
+try:
+    import vllm
+    print("1Cat-vLLM successfully loaded, version:", vllm.__version__)
+except Exception as e:
+    print("vLLM import note:", e)
+PY
+
+%runscript
+    exec vllm "$@"
+
+%help
+    1Cat-vLLM container for NVIDIA Tesla V100 (SM70).
+    
+    Runtime Example:
+      apptainer run --nv \
+        --bind /path/to/cache:/cache \
+        --bind /path/to/models:/models:ro \
+        1cat-vllm.sif serve /models/Qwen3.5-9B-AWQ-INT4 \
+        --dtype float16 \
+        --attention-backend FLASH_ATTN_V100 \
+        --quantization awq \
+        --host 0.0.0.0 --port 8000

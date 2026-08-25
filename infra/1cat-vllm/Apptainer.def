@@ -1,0 +1,62 @@
+Bootstrap: docker
+From: nvidia/cuda:12.8.0-devel-ubuntu24.04
+
+%labels
+    Author "DACN / Local-LLM Team"
+    Description "1Cat-vLLM Container for Tesla V100 (SM70) with FLASH_ATTN_V100 & AWQ"
+    Version "1.0"
+
+%environment
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+    export PATH=/opt/venv/bin:$PATH
+    export CUDA_HOME=/usr/local/cuda-12.8
+    export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:${LD_LIBRARY_PATH:-}
+    export VLLM_USE_V1=0
+    export NVIDIA_TF32_OVERRIDE=0
+    export NCCL_P2P_DISABLE=1
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update && apt-get install -y --no-install-recommends \
+        python3.12 \
+        python3.12-venv \
+        python3.12-dev \
+        python3-pip \
+        git \
+        git-lfs \
+        curl \
+        wget \
+        numactl \
+        ca-certificates \
+        && rm -rf /var/lib/apt/lists/*
+
+    python3.12 -m venv /opt/venv
+    export PATH=/opt/venv/bin:$PATH
+
+    pip install --upgrade pip setuptools wheel
+    
+    # Install PyTorch with CUDA 12.8
+    pip install --prefer-binary --no-cache-dir \
+        torch torchvision torchaudio \
+        --index-url https://download.pytorch.org/whl/cu128
+
+    # Install auxiliary utilities
+    pip install --no-cache-dir huggingface-hub hf-transfer openai
+
+    # Fetch and install latest 1Cat-vLLM wheel from GitHub releases
+    LATEST_WHEEL_URL=$(curl -s https://api.github.com/repos/1CatAI/1Cat-vLLM/releases/latest | \
+        grep "browser_download_url.*\.whl" | head -n 1 | cut -d '"' -f 4 || true)
+
+    if [ -n "$LATEST_WHEEL_URL" ]; then
+        curl -L "$LATEST_WHEEL_URL" -o /tmp/1cat_vllm.whl
+        pip install --prefer-binary --no-cache-dir \
+            --extra-index-url https://download.pytorch.org/whl/cu128 \
+            /tmp/1cat_vllm.whl
+        rm -f /tmp/1cat_vllm.whl
+    else
+        echo "Warning: Could not fetch wheel automatically during build. Please install wheel manually."
+    fi
+
+%runscript
+    exec vllm "$@"
