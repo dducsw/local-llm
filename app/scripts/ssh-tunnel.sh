@@ -20,7 +20,7 @@ fi
 # 2. Configuration parameters (priority: CLI Environment > .env)
 HPC_HOST="${GPU_HOST:-${HPC_SSH_HOST:-}}"
 HPC_USER="${GPU_USER:-${HPC_SSH_USER:-}}"
-SSH_KEY="${SSH_KEY:-${HPC_SSH_KEY:-}}"
+SSH_KEY="${SSH_KEY:-${HPC_HOST_SSH_KEY:-${HPC_SSH_KEY:-}}}"
 JUMP_HOST="${JUMP_HOST:-}"
 LOCAL_PORT="${LOCAL_PORT:-18000}"
 REMOTE_PORT="${REMOTE_PORT:-8000}"

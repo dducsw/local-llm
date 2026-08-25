@@ -1,9 +1,12 @@
+import asyncio
 import hashlib
 import json
 import logging
 import os
 import secrets
+import shutil
 import sqlite3
+import subprocess
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -301,11 +304,227 @@ class CreateKeyRequest(BaseModel):
     rpm: int = Field(default=60, ge=1, le=100000)
 
 
+HPC_SSH_HOST = os.getenv("HPC_SSH_HOST", "")
+HPC_SSH_USER = os.getenv("HPC_SSH_USER", "")
+HPC_SSH_KEY = os.getenv("HPC_SSH_KEY", "")
+if not HPC_SSH_KEY and os.path.exists("/run/secrets/hpc_ssh_key"):
+    HPC_SSH_KEY = "/run/secrets/hpc_ssh_key"
+HPC_REMOTE_DIR = os.getenv("HPC_REMOTE_DIR", "~/local-llm/infra")
+
+
+def run_slurm_cli(cmd_args: list[str], timeout: float = 8.0) -> tuple[int, str, str]:
+    """Execute Slurm command locally if tools exist, or over SSH if running on remote VM."""
+    binary = cmd_args[0]
+    # 1. Local execution if binary installed
+    if shutil.which(binary):
+        try:
+            res = subprocess.run(cmd_args, capture_output=True, text=True, timeout=timeout)
+            if res.returncode != 0:
+                log.warning("Local %s failed (code %s): %s", binary, res.returncode, res.stderr.strip())
+            return res.returncode, res.stdout, res.stderr
+        except Exception as e:
+            log.warning("Local %s exception: %s", binary, e)
+            return 1, "", str(e)
+
+    # 2. Remote SSH execution if HPC_SSH_HOST configured (VM -> HPC)
+    if HPC_SSH_HOST and HPC_SSH_HOST != "your-host":
+        try:
+            remote_cmd_str = " ".join(f"'{arg}'" if " " in arg or "%" in arg else arg for arg in cmd_args)
+            ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
+            if HPC_SSH_KEY and os.path.exists(os.path.expanduser(HPC_SSH_KEY)):
+                ssh_cmd.extend(["-i", os.path.expanduser(HPC_SSH_KEY)])
+            target = f"{HPC_SSH_USER}@{HPC_SSH_HOST}" if HPC_SSH_USER else HPC_SSH_HOST
+            ssh_cmd.extend([target, remote_cmd_str])
+            res = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=timeout)
+            if res.returncode != 0:
+                log.warning("SSH to %s failed (code %s): %s", target, res.returncode, res.stderr.strip())
+            return res.returncode, res.stdout, res.stderr
+        except Exception as e:
+            log.warning("SSH to %s exception: %s", HPC_SSH_HOST, e)
+            return 1, "", str(e)
+
+    return 127, "", f"Command '{binary}' not found and HPC_SSH_HOST not configured"
+
+
+class SSHTunnelManager:
+    """Manages background SSH port-forwarding tunnel from VM Gateway to HPC Compute Node."""
+
+    def __init__(self):
+        self.process: subprocess.Popen | None = None
+        self.target_node: str = ""
+        self.local_port: int = int(os.getenv("TUNNEL_LOCAL_PORT", "18000"))
+        self.remote_port: int = int(os.getenv("TUNNEL_REMOTE_PORT", "8000"))
+        self.status: str = "STOPPED"
+        self.last_error: str = ""
+        self.connected_at: float = 0.0
+
+    def is_alive(self) -> bool:
+        if self.process is not None:
+            if self.process.poll() is None:
+                return True
+            self.process = None
+            if self.status == "RUNNING":
+                self.status = "DISCONNECTED"
+        return False
+
+    def start(self, target_node: str = "", local_port: int | None = None, remote_port: int | None = None) -> bool:
+        if not HPC_SSH_HOST or HPC_SSH_HOST == "your-host":
+            self.status = "ERROR"
+            self.last_error = "HPC_SSH_HOST is not configured"
+            return False
+
+        lp = local_port or self.local_port
+        rp = remote_port or self.remote_port
+        node = target_node.strip() if target_node else "127.0.0.1"
+
+        if self.is_alive() and self.target_node == node and self.local_port == lp:
+            return True
+
+        self.stop()
+
+        self.target_node = node
+        self.local_port = lp
+        self.remote_port = rp
+        self.status = "STARTING"
+        self.last_error = ""
+
+        forward_target = f"{node}:{rp}" if node and node not in ("localhost", "127.0.0.1", "") else f"127.0.0.1:{rp}"
+        forward_rule = f"{lp}:{forward_target}"
+
+        cmd = [
+            "ssh",
+            "-N",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "ConnectTimeout=5",
+            "-o", "BatchMode=yes",
+            "-o", "ExitOnForwardFailure=yes",
+            "-o", "ServerAliveInterval=30",
+            "-o", "ServerAliveCountMax=3",
+            "-L", forward_rule,
+        ]
+        if HPC_SSH_KEY and os.path.exists(os.path.expanduser(HPC_SSH_KEY)):
+            cmd.extend(["-i", os.path.expanduser(HPC_SSH_KEY)])
+
+        target = f"{HPC_SSH_USER}@{HPC_SSH_HOST}" if HPC_SSH_USER else HPC_SSH_HOST
+        cmd.append(target)
+
+        try:
+            log.info("Starting background SSH tunnel: %s (forwarding %s)", " ".join(cmd), forward_rule)
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            time.sleep(0.6)
+            if self.process.poll() is not None:
+                _, stderr = self.process.communicate()
+                self.status = "ERROR"
+                self.last_error = stderr.strip() or f"SSH tunnel exited with code {self.process.returncode}"
+                log.error("SSH tunnel failed immediately: %s", self.last_error)
+                self.process = None
+                return False
+
+            self.status = "RUNNING"
+            self.connected_at = time.time()
+            log.info("SSH tunnel established: 127.0.0.1:%s -> %s:%s via %s", lp, node, rp, target)
+            return True
+        except Exception as exc:
+            self.status = "ERROR"
+            self.last_error = str(exc)
+            log.error("Exception starting SSH tunnel: %s", exc)
+            self.process = None
+            return False
+
+    def stop(self):
+        if self.process is not None:
+            try:
+                log.info("Terminating SSH tunnel to %s", self.target_node)
+                self.process.terminate()
+                self.process.wait(timeout=2.0)
+            except Exception:
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
+            finally:
+                self.process = None
+        self.status = "STOPPED"
+        self.connected_at = 0.0
+
+    def get_info(self) -> dict[str, Any]:
+        alive = self.is_alive()
+        return {
+            "status": "RUNNING" if alive else self.status,
+            "alive": alive,
+            "target_node": self.target_node,
+            "local_port": self.local_port,
+            "remote_port": self.remote_port,
+            "connected_at": self.connected_at,
+            "uptime_seconds": int(time.time() - self.connected_at) if (alive and self.connected_at > 0) else 0,
+            "last_error": self.last_error,
+        }
+
+
+TUNNEL_MANAGER = SSHTunnelManager()
+
+
+async def auto_tunnel_monitor_loop():
+    """Background task to continuously monitor Slurm jobs and automatically maintain the SSH tunnel."""
+    while True:
+        try:
+            if HPC_SSH_HOST and HPC_SSH_HOST != "your-host":
+                cmd = ["squeue", "--format=%i|%j|%P|%T|%M|%R|%b", "--noheader"]
+                if HPC_SSH_USER:
+                    cmd.extend(["-u", HPC_SSH_USER])
+                code, stdout, _ = run_slurm_cli(cmd, timeout=5.0)
+                if code == 0 and stdout:
+                    running_node = None
+                    for line in stdout.strip().splitlines():
+                        parts = line.strip().split("|")
+                        if len(parts) >= 6:
+                            job_status = parts[3].strip().upper()
+                            job_node = parts[5].strip()
+                            if job_status == "RUNNING" and job_node and not job_node.startswith("("):
+                                running_node = job_node
+                                break
+                    if running_node:
+                        if not TUNNEL_MANAGER.is_alive() or TUNNEL_MANAGER.target_node != running_node:
+                            log.info("Auto-Tunnel: Active Slurm node '%s' detected, connecting tunnel...", running_node)
+                            TUNNEL_MANAGER.start(target_node=running_node)
+        except Exception as exc:
+            log.debug("Auto-tunnel loop check exception: %s", exc)
+        await asyncio.sleep(10)
+
+
+async def watch_and_tunnel_job(job_id: str):
+    """Wait for newly submitted job to transition to RUNNING, then immediately establish the tunnel."""
+    for _ in range(60):  # poll every 3s for up to 3 minutes
+        await asyncio.sleep(3)
+        cmd = ["squeue", "-j", str(job_id), "--format=%T|%R", "--noheader"]
+        code, stdout, _ = run_slurm_cli(cmd, timeout=4.0)
+        if code == 0 and stdout.strip():
+            parts = stdout.strip().split("|")
+            status = parts[0].strip().upper()
+            node = parts[1].strip() if len(parts) > 1 else ""
+            if status == "RUNNING" and node and not node.startswith("("):
+                log.info("Job %s is now RUNNING on node %s. Establishing tunnel immediately.", job_id, node)
+                TUNNEL_MANAGER.start(target_node=node)
+                break
+            elif status in ("FAILED", "CANCELLED", "COMPLETED"):
+                break
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
     log.info("started db=%s models=%s", DB_PATH, list(MODELS))
+    # Start auto-tunnel sync background loop
+    monitor_task = asyncio.create_task(auto_tunnel_monitor_loop())
     yield
+    # Cleanup on exit
+    monitor_task.cancel()
+    TUNNEL_MANAGER.stop()
 
 
 app = FastAPI(
@@ -562,6 +781,7 @@ async def get_slurm_status():
         "status": "live",
         "nodes": nodes_res.get("nodes", []),
         "jobs": jobs_res.get("jobs", []),
+        "tunnel": TUNNEL_MANAGER.get_info(),
     }
 
 
@@ -1144,52 +1364,42 @@ async def get_gpu_telemetry():
     }
 
 
-HPC_SSH_HOST = os.getenv("HPC_SSH_HOST", "")
-HPC_SSH_USER = os.getenv("HPC_SSH_USER", "")
-HPC_SSH_KEY = os.getenv("HPC_SSH_KEY", "")
-if not HPC_SSH_KEY and os.path.exists("/run/secrets/hpc_ssh_key"):
-    HPC_SSH_KEY = "/run/secrets/hpc_ssh_key"
-HPC_REMOTE_DIR = os.getenv("HPC_REMOTE_DIR", "~/local-llm/infra")
-
-
-def run_slurm_cli(cmd_args: list[str], timeout: float = 8.0) -> tuple[int, str, str]:
-    """Execute Slurm command locally if tools exist, or over SSH if running on remote VM."""
-    import shutil
-    import subprocess
-
-    binary = cmd_args[0]
-    # 1. Local execution if binary installed
-    if shutil.which(binary):
-        try:
-            res = subprocess.run(cmd_args, capture_output=True, text=True, timeout=timeout)
-            if res.returncode != 0:
-                log.warning("Local %s failed (code %s): %s", binary, res.returncode, res.stderr.strip())
-            return res.returncode, res.stdout, res.stderr
-        except Exception as e:
-            log.warning("Local %s exception: %s", binary, e)
-            return 1, "", str(e)
-
-    # 2. Remote SSH execution if HPC_SSH_HOST configured (VM -> HPC)
-    if HPC_SSH_HOST and HPC_SSH_HOST != "your-host":
-        try:
-            remote_cmd_str = " ".join(f"'{arg}'" if " " in arg or "%" in arg else arg for arg in cmd_args)
-            ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
-            if HPC_SSH_KEY and os.path.exists(os.path.expanduser(HPC_SSH_KEY)):
-                ssh_cmd.extend(["-i", os.path.expanduser(HPC_SSH_KEY)])
-            target = f"{HPC_SSH_USER}@{HPC_SSH_HOST}" if HPC_SSH_USER else HPC_SSH_HOST
-            ssh_cmd.extend([target, remote_cmd_str])
-            res = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=timeout)
-            if res.returncode != 0:
-                log.warning("SSH to %s failed (code %s): %s", target, res.returncode, res.stderr.strip())
-            return res.returncode, res.stdout, res.stderr
-        except Exception as e:
-            log.warning("SSH to %s exception: %s", HPC_SSH_HOST, e)
-            return 1, "", str(e)
-
-    return 127, "", f"Command '{binary}' not found and HPC_SSH_HOST not configured"
-
-
 ACTIVE_SLURM_JOBS: list[dict[str, Any]] = []
+
+
+@app.get("/api/slurm/tunnel")
+async def get_tunnel_status():
+    """Return live status of the background SSH port-forwarding tunnel."""
+    return TUNNEL_MANAGER.get_info()
+
+
+class StartTunnelRequest(BaseModel):
+    node: str = ""
+    local_port: int = 18000
+    remote_port: int = 8000
+
+
+@app.post("/api/slurm/tunnel/start", dependencies=[Depends(require_admin)])
+async def start_tunnel_manual(body: StartTunnelRequest):
+    """Manually start or re-route SSH tunnel to a specific compute node."""
+    ok = TUNNEL_MANAGER.start(
+        target_node=body.node,
+        local_port=body.local_port,
+        remote_port=body.remote_port,
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start SSH tunnel: {TUNNEL_MANAGER.last_error or 'unknown error'}",
+        )
+    return {"status": "running", "tunnel": TUNNEL_MANAGER.get_info()}
+
+
+@app.post("/api/slurm/tunnel/stop", dependencies=[Depends(require_admin)])
+async def stop_tunnel_manual():
+    """Manually terminate the background SSH tunnel."""
+    TUNNEL_MANAGER.stop()
+    return {"status": "stopped", "tunnel": TUNNEL_MANAGER.get_info()}
 
 
 @app.get("/api/slurm/nodes")
@@ -1273,7 +1483,7 @@ async def get_slurm_jobs():
 
 @app.post("/api/slurm/jobs/submit", dependencies=[Depends(require_admin)])
 async def submit_slurm_job(body: SubmitJobRequest):
-    """Submit new vLLM serving sbatch job on Slurm cluster (locally or via SSH)."""
+    """Submit new vLLM serving sbatch job on Slurm cluster and auto-connect SSH tunnel."""
     script_rel = "slurm/serving/vllm-singlegpu.sbatch"
 
     # If running on VM via SSH:
@@ -1286,10 +1496,12 @@ async def submit_slurm_job(body: SubmitJobRequest):
         code, stdout, stderr = run_slurm_cli(remote_submit_cmd, timeout=12.0)
         if code == 0 and "Submitted batch job" in stdout:
             job_id = stdout.strip().split()[-1]
+            # Automatically start background watcher to connect SSH tunnel when job is RUNNING
+            asyncio.create_task(watch_and_tunnel_job(job_id))
             return {
                 "status": "submitted",
                 "job_id": job_id,
-                "message": f"Job {job_id} submitted to HPC {body.partition}",
+                "message": f"Job {job_id} submitted to HPC {body.partition}. Auto-Tunnel watcher started.",
             }
         elif code != 127:
             raise HTTPException(status_code=500, detail=f"SSH sbatch failed: {stderr or stdout}")
@@ -1338,9 +1550,14 @@ async def submit_slurm_job(body: SubmitJobRequest):
 
 @app.post("/api/slurm/jobs/{job_id}/cancel", dependencies=[Depends(require_admin)])
 async def cancel_slurm_job(job_id: str):
-    """Cancel a running Slurm job via scancel (locally or via SSH)."""
+    """Cancel a running Slurm job via scancel and cleanup tunnel."""
     code, stdout, stderr = run_slurm_cli(["scancel", job_id])
     if code == 0:
+        # Check if any other jobs running
+        jobs_res = await get_slurm_jobs()
+        running_jobs = [j for j in jobs_res.get("jobs", []) if j.get("status") == "RUNNING" and j.get("job_id") != job_id]
+        if not running_jobs:
+            TUNNEL_MANAGER.stop()
         return {"status": "cancelled", "job_id": job_id, "message": f"Job {job_id} cancelled via scancel."}
 
     # In mock tracking
@@ -1355,7 +1572,6 @@ async def cancel_slurm_job(job_id: str):
 @app.get("/api/slurm/logs/{job_id}")
 async def get_slurm_job_log(job_id: str):
     """Read standard output log for a given Slurm job ID (locally or via SSH)."""
-    # Try reading via SSH if on VM
     if HPC_SSH_HOST:
         code, stdout, _ = run_slurm_cli([
             "tail", "-n", "100", f"{HPC_REMOTE_DIR}/logs/vllm-{job_id}.out"
@@ -1363,7 +1579,6 @@ async def get_slurm_job_log(job_id: str):
         if code == 0 and stdout:
             return {"job_id": job_id, "log": stdout}
 
-    # Try local filesystem
     log_candidates = [
         ROOT_DIR / "infra" / "logs" / f"vllm-{job_id}.out",
         ROOT_DIR / "infra" / "logs" / f"qwen-server-{job_id}.out",

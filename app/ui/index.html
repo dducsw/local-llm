@@ -2515,9 +2515,17 @@
                 if (res.ok) {
                     const data = await res.json();
                     const jobs = data.jobs || [];
+                    const tunnel = data.tunnel;
                     document.getElementById('slurm-active-count').innerText = jobs.length;
                     if (jobs.length > 0 && document.getElementById('slurm-active-node-badge')) {
                         document.getElementById('slurm-active-node-badge').innerText = `Node: ${jobs[0].node}`;
+                    }
+                    if (tunnel && document.getElementById('slurm-cluster-status-sub')) {
+                        if (tunnel.alive) {
+                            document.getElementById('slurm-cluster-status-sub').innerText = `⚡ SSH Tunnel: ACTIVE (127.0.0.1:${tunnel.local_port} ➔ ${tunnel.target_node}:${tunnel.remote_port})`;
+                        } else {
+                            document.getElementById('slurm-cluster-status-sub').innerText = `Slurm Cluster Telemetry (Auto-Tunnel Ready)`;
+                        }
                     }
 
                     if (jobs.length === 0) {
