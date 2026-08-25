@@ -1180,20 +1180,7 @@ def run_slurm_cli(cmd_args: list[str], timeout: float = 8.0) -> tuple[int, str, 
     return 127, "", f"Command '{binary}' not found and HPC_SSH_HOST not configured"
 
 
-ACTIVE_SLURM_JOBS: list[dict[str, Any]] = [
-    {
-        "job_id": "491823",
-        "name": "qwen3.5-9b-vllm",
-        "partition": "gpu-queue",
-        "status": "RUNNING",
-        "time": "01:24:18",
-        "node": "gpunode1",
-        "gres": "gpu:v100:1",
-        "model": "Qwen3.5-9B-Q4_K_M.gguf",
-        "port": 8000,
-        "tp": 1,
-    }
-]
+ACTIVE_SLURM_JOBS: list[dict[str, Any]] = []
 
 
 @app.get("/api/slurm/nodes")
@@ -1229,45 +1216,9 @@ async def get_slurm_nodes():
                     "gres": gres,
                     "partition": partition,
                 })
+        return {"nodes": nodes}
 
-    if not nodes:
-        # Fallback to realistic cluster state provided by user
-        nodes = [
-            {
-                "node": "gpunode1",
-                "state": "idle",
-                "cpus": "0/24/0/24",
-                "memory": "515112",
-                "gres": "gpu:v100:4",
-                "partition": "gpu-queue",
-            },
-            {
-                "node": "gpunode2",
-                "state": "drained*",
-                "cpus": "0/0/24/24",
-                "memory": "515112",
-                "gres": "gpu:v100:4",
-                "partition": "gpu-queue",
-            },
-            {
-                "node": "gpunode3",
-                "state": "idle",
-                "cpus": "0/24/0/24",
-                "memory": "515112",
-                "gres": "gpu:v100:4",
-                "partition": "gpu-queue",
-            },
-            {
-                "node": "gpunode4",
-                "state": "mixed",
-                "cpus": "16/8/0/24",
-                "memory": "515112",
-                "gres": "gpu:v100:4",
-                "partition": "gpu-queue",
-            },
-        ]
-
-    return {"nodes": nodes}
+    return {"nodes": []}
 
 
 class SubmitJobRequest(BaseModel):
@@ -1281,30 +1232,33 @@ class SubmitJobRequest(BaseModel):
 @app.get("/api/slurm/jobs")
 async def get_slurm_jobs():
     """Return active and recent Slurm job status and logs."""
-    code, stdout, _ = run_slurm_cli(
-        ["squeue", "--format=%i|%j|%P|%T|%M|%R|%b", "--noheader"]
-    )
+    cmd = ["squeue", "--format=%i|%j|%P|%T|%M|%R|%b", "--noheader"]
+    if HPC_SSH_USER:
+        cmd.extend(["-u", HPC_SSH_USER])
+
+    code, stdout, _ = run_slurm_cli(cmd)
 
     jobs = []
-    if code == 0 and stdout:
-        for line in stdout.strip().split("\n"):
-            if not line.strip():
-                continue
-            parts = line.split("|")
-            if len(parts) >= 6:
-                jobs.append({
-                    "job_id": parts[0].strip(),
-                    "name": parts[1].strip(),
-                    "partition": parts[2].strip(),
-                    "status": parts[3].strip(),
-                    "time": parts[4].strip(),
-                    "node": parts[5].strip(),
-                    "gres": parts[6].strip() if len(parts) > 6 else "gpu:1",
-                })
+    if code == 0:
+        if stdout and stdout.strip():
+            for line in stdout.strip().split("\n"):
+                if not line.strip():
+                    continue
+                parts = line.split("|")
+                if len(parts) >= 6:
+                    jobs.append({
+                        "job_id": parts[0].strip(),
+                        "name": parts[1].strip(),
+                        "partition": parts[2].strip(),
+                        "status": parts[3].strip(),
+                        "time": parts[4].strip(),
+                        "node": parts[5].strip(),
+                        "gres": parts[6].strip() if len(parts) > 6 else "gpu:1",
+                    })
+        return {"jobs": jobs}
 
-    if not jobs:
-        jobs = [j for j in ACTIVE_SLURM_JOBS if j.get("status") in ("RUNNING", "PENDING")]
-
+    # Only if CLI failed / not connected: return in-memory jobs submitted via Web UI
+    jobs = [j for j in ACTIVE_SLURM_JOBS if j.get("status") in ("RUNNING", "PENDING")]
     return {"jobs": jobs}
 
 
@@ -1417,22 +1371,7 @@ async def get_slurm_job_log(job_id: str):
 
     return {
         "job_id": job_id,
-        "log": f"""============================================================
-Job ID:    {job_id}
-Node:      gpunode1.gitc.hpc
-Image:     /home/u001013/local-llm/infra/build/vllm.sif
-Model:     Qwen3.5-9B-Q4_K_M.gguf
-Port:      8000
-TP:        1
-============================================================
-Tesla V100-SXM2-16GB, 535.183.01, 16384 MiB
-INFO 08-25 14:00:12 [api_server.py:1044] Initializing vLLM (Legacy V0 Engine for SM70 Volta)
-INFO 08-25 14:00:13 [config.py:340] Prefix caching enabled: True, Chunked prefill: True
-INFO 08-25 14:00:15 [model_runner.py:1108] Loading GGUF weights: /cache/models/Qwen3.5-9B-Q4_K_M.gguf
-INFO 08-25 14:00:20 [model_runner.py:1210] Memory profiling: Model weights 5824 MiB, KV Cache 9216 MiB
-INFO 08-25 14:00:22 [api_server.py:1150] Route: POST /v1/chat/completions ready
-INFO 08-25 14:00:22 [api_server.py:1152] Server started on http://0.0.0.0:8000
-""",
+        "log": f"No active log file found for Slurm Job ID {job_id} in {HPC_REMOTE_DIR}/logs/.",
     }
 
 
