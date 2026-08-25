@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  gateway:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: v100-local-gateway
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+
+    # Resource Constraints & Performance Throttling
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'           # Max 1 CPU core (lightweight reverse proxy)
+          memory: 512M          # Max 512MB RAM
+        reservations:
+          cpus: '0.25'          # Guaranteed 0.25 CPU
+          memory: 128M          # Guaranteed 128MB RAM
+
+    volumes:
+      # Persistent SQLite database & API Keys
+      - ./app/data:/workspace/app/data
+      # Models configuration
+      - ./app/config:/workspace/app/config
+      # Live UI hot-reload without container rebuild
+      - ./app/ui:/workspace/app/ui
+      # Optional: Mount host SSH key to allow Slurm supervision over SSH
+      - ~/.ssh:/root/.ssh:ro
+
+    # Prevent runaway container log files on disk
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
