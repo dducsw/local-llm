@@ -214,9 +214,39 @@ async function fetchTunnelTelemetry() {
     }
 }
 
+function updateSlurmScriptPreview() {
+    const modelSelect = document.getElementById('submit-job-model');
+    const tpInput = document.getElementById('submit-job-tp');
+    const codeEl = document.getElementById('submit-job-script-code');
+    const descEl = document.getElementById('submit-job-script-desc');
+    if (!modelSelect || !codeEl || !descEl) return;
+
+    const val = modelSelect.value || '';
+    const tp = parseInt(tpInput?.value, 10) || 1;
+
+    if (val.includes('llama') || val.includes('.gguf')) {
+        codeEl.innerText = 'infra/llama-cpp/run_qwen_server.sbatch';
+        descEl.innerText = 'llama.cpp CUDA server on V100 GPU with automatic reverse SSH tunnel.';
+    } else if (val.includes('1cat') || val.includes('AWQ')) {
+        if (tp > 1) {
+            codeEl.innerText = 'infra/1cat-vllm/slurm/serving/vllm-1cat-multigpu.sbatch';
+            descEl.innerText = `1Cat-vLLM Multi-GPU Tensor Parallelism (TP=${tp}) with FLASH_ATTN_V100 & TurboMind AWQ.`;
+        } else {
+            codeEl.innerText = 'infra/1cat-vllm/slurm/serving/vllm-1cat-singlegpu.sbatch';
+            descEl.innerText = '1Cat-vLLM Single-GPU serving with FLASH_ATTN_V100 & TurboMind AWQ kernels on V100.';
+        }
+    } else {
+        codeEl.innerText = 'infra/vllm/slurm/serving/vllm-singlegpu.sbatch';
+        descEl.innerText = 'Standard vLLM Engine with Prefix Caching & Chunked Prefill on NUMA Socket 0.';
+    }
+}
+
 function openSubmitJobModal() {
     const modal = document.getElementById('modal-submit-job');
-    if (modal) modal.classList.remove('hidden');
+    if (modal) {
+        modal.classList.remove('hidden');
+        updateSlurmScriptPreview();
+    }
 }
 
 function closeSubmitJobModal() {

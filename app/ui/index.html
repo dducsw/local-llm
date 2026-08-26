@@ -1172,7 +1172,7 @@
                 <div class="flex items-center gap-2.5">
                     <i data-lucide="play-circle" class="w-5 h-5 text-neon-700 dark:text-neon-400"></i>
                     <h3 class="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                        Launch vLLM Slurm Serving Job (sbatch)
+                        Launch Slurm Serving Job (sbatch)
                     </h3>
                 </div>
                 <button onclick="closeSubmitJobModal()"
@@ -1183,10 +1183,12 @@
 
             <div class="space-y-3.5 text-xs">
                 <div>
-                    <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Model Weights & Format</label>
-                    <select id="submit-job-model"
+                    <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Engine & Model Weights</label>
+                    <select id="submit-job-model" onchange="updateSlurmScriptPreview()"
                         class="w-full p-2.5 bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
-                        <option value="">Loading models...</option>
+                        <option value="llama:Qwen3.5-9B-Q4_K_M.gguf" selected>Qwen 3.5 9B (llama.cpp Server - GGUF)</option>
+                        <option value="1cat:Qwen3.5-9B-AWQ-INT4">Qwen 3.5 9B (1Cat-vLLM - AWQ INT4 Volta SM70)</option>
+                        <option value="vllm:Qwen3.5-9B-Q4_K_M.gguf">Qwen 3.5 9B (Standard vLLM Engine)</option>
                     </select>
                 </div>
 
@@ -1195,13 +1197,13 @@
                         <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Target Partition</label>
                         <select id="submit-job-partition"
                             class="w-full p-2.5 bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
-                            <option value="gpu-queue" selected>gpu-queue</option>
+                            <option value="gpu-queue" selected>gpu-queue (QoS: gpu-q)</option>
                             <option value="gpu-v100">gpu-v100</option>
                         </select>
                     </div>
                     <div>
                         <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Walltime Limit</label>
-                        <input id="submit-job-time" type="text" value="01:00:00"
+                        <input id="submit-job-time" type="text" value="04:00:00"
                             class="w-full p-2.5 bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
                     </div>
                 </div>
@@ -1214,15 +1216,15 @@
                     </div>
                     <div>
                         <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Tensor Parallelism (TP)</label>
-                        <input id="submit-job-tp" type="number" min="1" max="4" value="1"
+                        <input id="submit-job-tp" type="number" min="1" max="4" value="1" onchange="updateSlurmScriptPreview()"
                             class="w-full p-2.5 bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
                     </div>
                 </div>
 
-                <div class="p-3 rounded-xl bg-neon-50 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30 text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
+                <div id="submit-job-script-preview" class="p-3 rounded-xl bg-neon-50 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30 text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
                     <strong class="text-neon-800 dark:text-neon-400 font-bold">Execution Script:</strong>
-                    <code>infra/slurm/serving/vllm-singlegpu.sbatch</code><br>
-                    Enables Prefix Caching & Chunked Prefill on NUMA Socket 0.
+                    <code id="submit-job-script-code">infra/llama-cpp/run_qwen_server.sbatch</code><br>
+                    <span id="submit-job-script-desc">llama.cpp CUDA server on V100 GPU with automatic reverse SSH tunnel.</span>
                 </div>
             </div>
 

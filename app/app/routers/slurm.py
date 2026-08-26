@@ -122,8 +122,20 @@ async def get_slurm_jobs():
 
 @router.post("/jobs/submit", dependencies=[Depends(require_admin)])
 async def submit_slurm_job(body: SubmitJobRequest):
-    """Submit new vLLM serving sbatch job on Slurm cluster and auto-connect SSH tunnel."""
-    script_rel = "slurm/serving/vllm-singlegpu.sbatch"
+    """Submit new serving sbatch job (llama.cpp, 1Cat-vLLM, or standard vLLM) on Slurm cluster and auto-connect SSH tunnel."""
+    model_str = (body.model or "").lower()
+    
+    # Resolve appropriate script relative to infra/
+    if "llama" in model_str or model_str.endswith(".gguf") or "gguf" in model_str:
+        script_rel = "llama-cpp/run_qwen_server.sbatch"
+    elif "1cat" in model_str or "awq" in model_str:
+        if body.tp > 1:
+            script_rel = "1cat-vllm/slurm/serving/vllm-1cat-multigpu.sbatch"
+        else:
+            script_rel = "1cat-vllm/slurm/serving/vllm-1cat-singlegpu.sbatch"
+    else:
+        script_rel = "vllm/slurm/serving/vllm-singlegpu.sbatch"
+
     time_limit = body.time_limit.strip() if body.time_limit else "01:00:00"
 
     submit_cmd = [
@@ -131,6 +143,8 @@ async def submit_slurm_job(body: SubmitJobRequest):
         f"--partition={body.partition}",
         f"--time={time_limit}",
     ]
+    if body.partition == "gpu-queue":
+        submit_cmd.append("--qos=gpu-q")
     if HPC_SLURM_ACCOUNT:
         submit_cmd.append(f"--account={HPC_SLURM_ACCOUNT}")
     submit_cmd.append(script_rel)
@@ -145,7 +159,7 @@ async def submit_slurm_job(body: SubmitJobRequest):
             return {
                 "status": "submitted",
                 "job_id": job_id,
-                "message": f"Job {job_id} submitted to HPC {body.partition}. Auto-Tunnel watcher started.",
+                "message": f"Job {job_id} ({script_rel}) submitted to HPC {body.partition}. Auto-Tunnel watcher started.",
             }
         elif code != 127:
             raise HTTPException(status_code=500, detail=f"SSH sbatch failed: {stderr or stdout}")
@@ -156,18 +170,24 @@ async def submit_slurm_job(body: SubmitJobRequest):
         script_path = ROOT_DIR / "demo" / "run_qwen_server.sbatch"
 
     if script_path.exists():
-        code, stdout, stderr = await run_slurm_cli_async([
+        direct_cmd = [
             "sbatch",
             f"--partition={body.partition}",
-            f"--time={body.time_limit}",
-            str(script_path),
-        ], use_cache=False)
+            f"--time={time_limit}",
+        ]
+        if body.partition == "gpu-queue":
+            direct_cmd.append("--qos=gpu-q")
+        if HPC_SLURM_ACCOUNT:
+            direct_cmd.append(f"--account={HPC_SLURM_ACCOUNT}")
+        direct_cmd.append(str(script_path))
+
+        code, stdout, stderr = await run_slurm_cli_async(direct_cmd, use_cache=False)
         if code == 0 and "Submitted batch job" in stdout:
             job_id = stdout.strip().split()[-1]
             return {
                 "status": "submitted",
                 "job_id": job_id,
-                "message": f"Job {job_id} submitted to {body.partition}",
+                "message": f"Job {job_id} ({script_rel}) submitted to {body.partition}",
             }
 
     # Local / Mock submission fallback
