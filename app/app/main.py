@@ -1,4 +1,5 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
@@ -41,6 +42,7 @@ app = FastAPI(
     version="2.0.0",
     description="Unified API Gateway and Slurm Supervision Dashboard for Local LLM Inference on HPC",
     lifespan=lifespan,
+    root_path=os.getenv("ROOT_PATH", ""),
 )
 
 # Mount all modular application routers
@@ -65,4 +67,4 @@ if ui_dir.is_dir():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=9000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=int(os.getenv("PORT", "9001")), reload=True)

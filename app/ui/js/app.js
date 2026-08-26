@@ -1,9 +1,9 @@
 // ==============================================================================
 // 1. GLOBAL STATE & CONFIGURATION
+// Automatically detect base URL and any subpath prefix (e.g. /llm or root /)
 // ==============================================================================
-const GATEWAY_BASE = window.location.port === '9000' || window.location.port === '8000'
-    ? `${window.location.protocol}//${window.location.hostname}:${window.location.port}`
-    : `${window.location.protocol}//${window.location.host}`;
+const currentSubpath = window.location.pathname.replace(/\/+$/, '');
+const GATEWAY_BASE = `${window.location.origin}${currentSubpath}`;
 
 let activeApiKey = localStorage.getItem('hpc_active_api_key') || localStorage.getItem('hpc_llm_api_key') || 'sk-hpc-demo';
 let adminToken = '';

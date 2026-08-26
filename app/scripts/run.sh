@@ -13,8 +13,8 @@ fi
 echo
 echo "Starting AI Local Gateway using Docker Compose..."
 echo
-echo "Dashboard: http://127.0.0.1:9000/"
-echo "Health:    http://127.0.0.1:9000/healthz"
+echo "Dashboard: http://127.0.0.1:9001/"
+echo "Health:    http://127.0.0.1:9001/healthz"
 echo
 
 # Start using docker-compose

@@ -23,10 +23,10 @@ WORKDIR /workspace/app
 # Ensure data and config directories exist
 RUN mkdir -p /workspace/app/data /workspace/app/config
 
-EXPOSE 9000
+EXPOSE 9001
 
 # Health check against gateway health endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:9000/health || exit 1
+  CMD curl -f http://localhost:9001/health || exit 1
 
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9001"]
