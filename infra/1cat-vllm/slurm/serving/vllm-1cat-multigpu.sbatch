@@ -1,6 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=1cat-vllm-multi
 #SBATCH --partition=gpu-queue
+#SBATCH --qos=gpu-q
+#SBATCH --account=summer-school
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:2

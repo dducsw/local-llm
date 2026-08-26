@@ -1,6 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=hf-download-qwen-awq
-#SBATCH --partition=cpu-queue
+#SBATCH --partition=gpu-queue
+#SBATCH --qos=gpu-q
+#SBATCH --account=summer-school
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
@@ -34,8 +36,32 @@ elif python3 -c "import huggingface_hub" &>/dev/null; then
 from huggingface_hub import snapshot_download
 snapshot_download(repo_id='$MODEL_REPO', local_dir='$MODEL_SUBDIR', local_dir_use_symlinks=False)
 "
+elif command -v python3 &>/dev/null; then
+  echo "Using Python urllib fallback to download repository files..."
+  python3 - <<PY
+import os
+import json
+import urllib.request
+
+repo = "$MODEL_REPO"
+dest = "$MODEL_SUBDIR"
+os.makedirs(dest, exist_ok=True)
+
+api_url = f"https://huggingface.co/api/models/{repo}"
+req = urllib.request.Request(api_url, headers={"User-Agent": "1cat-vllm-downloader"})
+with urllib.request.urlopen(req) as resp:
+    data = json.loads(resp.read().decode())
+siblings = [f["rfilename"] for f in data.get("siblings", []) if not f["rfilename"].startswith(".")]
+for idx, fname in enumerate(siblings, 1):
+    target_path = os.path.join(dest, fname)
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    file_url = f"https://huggingface.co/{repo}/resolve/main/{fname}"
+    print(f"[{idx}/{len(siblings)}] Downloading {fname}...")
+    urllib.request.urlretrieve(file_url, target_path)
+print("Done.")
+PY
 else
-  echo "Error: huggingface-cli or huggingface_hub Python package not found." >&2
+  echo "Error: Neither huggingface-cli, huggingface_hub, nor python3 is available." >&2
   exit 1
 fi
 

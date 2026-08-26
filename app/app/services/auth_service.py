@@ -125,7 +125,9 @@ def require_api_key(
         )
 
     if raw in ADMIN_SESSIONS:
-        if time.time() < ADMIN_SESSIONS[raw]:
+        sess = ADMIN_SESSIONS[raw]
+        exp = sess["expires_at"] if isinstance(sess, dict) else sess
+        if time.time() < exp:
             return Identity(
                 id=0,
                 prefix="admin",
