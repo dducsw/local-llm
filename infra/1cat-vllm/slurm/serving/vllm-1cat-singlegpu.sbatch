@@ -134,7 +134,7 @@ echo "Resolved model path in container: $MODEL_ARG"
   --trust-remote-code \
   --enable-prefix-caching \
   --enable-chunked-prefill \
-  --limit-mm-per-prompt image=0,video=0 \
+  --limit-mm-per-prompt '{"image": 0, "video": 0}' \
   "${QUANT_ARGS[@]}" &
 
 VLLM_PID=$!
