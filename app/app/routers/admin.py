@@ -14,7 +14,7 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)], tags=
 
 
 @router.post("/keys")
-def create_key(body: CreateKeyRequest):
+def create_key(body: CreateKeyRequest, current_user: str = Depends(require_admin)):
     available_models = load_models()
     for m in body.allowed_models:
         if m != "*" and m not in available_models:
