@@ -48,32 +48,17 @@ async def models(
                 backend_status[model_id] = False
 
     data = []
-    if is_admin:
-        for model_id, cfg in current_models.items():
-            is_online = backend_status.get(model_id, False)
-            data.append(
-                {
-                    "id": model_id,
-                    "object": "model",
-                    "status": "online" if is_online else "offline",
-                    "owned_by": cfg.get("owned_by", "hpc-cluster"),
-                    "upstream_model": cfg.get("upstream_model", model_id),
-                }
-            )
-    else:
-        identity = require_api_key(authorization, x_admin_session, x_admin_token)
-        for model_id, cfg in current_models.items():
-            if allowed(identity, model_id):
-                is_online = backend_status.get(model_id, False)
-                data.append(
-                    {
-                        "id": model_id,
-                        "object": "model",
-                        "status": "online" if is_online else "offline",
-                        "owned_by": cfg.get("owned_by", "hpc-cluster"),
-                        "upstream_model": cfg.get("upstream_model", model_id),
-                    }
-                )
+    for model_id, cfg in current_models.items():
+        is_online = backend_status.get(model_id, False)
+        data.append(
+            {
+                "id": model_id,
+                "object": "model",
+                "status": "online" if is_online else "offline",
+                "owned_by": cfg.get("owned_by", "hpc-cluster"),
+                "upstream_model": cfg.get("upstream_model", model_id),
+            }
+        )
     return {"object": "list", "data": data}
 
 

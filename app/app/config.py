@@ -24,13 +24,22 @@ for env_candidate in [APP_DIR / ".env", ROOT_DIR / ".env", Path(".env")]:
             pass
         break
 
-DB_PATH = Path(os.getenv("KEY_DB", str(APP_DIR / "data" / "gateway.db")))
-if not DB_PATH.is_absolute() and not DB_PATH.exists() and (ROOT_DIR / DB_PATH).exists():
-    DB_PATH = ROOT_DIR / DB_PATH
+def _resolve_config_path(env_var: str, default_rel: str) -> Path:
+    val = os.getenv(env_var, "")
+    if val:
+        p = Path(val)
+        if p.is_absolute() and p.exists():
+            return p
+        if (APP_DIR / p).exists():
+            return APP_DIR / p
+        if (ROOT_DIR / p).exists():
+            return ROOT_DIR / p
+        if (APP_DIR / p.name).exists():
+            return APP_DIR / p.name
+    return APP_DIR / default_rel
 
-MODEL_CONFIG = Path(os.getenv("MODEL_CONFIG", str(APP_DIR / "config" / "models.json")))
-if not MODEL_CONFIG.is_absolute() and not MODEL_CONFIG.exists() and (ROOT_DIR / MODEL_CONFIG).exists():
-    MODEL_CONFIG = ROOT_DIR / MODEL_CONFIG
+DB_PATH = _resolve_config_path("KEY_DB", "data/gateway.db")
+MODEL_CONFIG = _resolve_config_path("MODEL_CONFIG", "config/models.json")
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", os.getenv("ADMIN_TOKEN", ""))

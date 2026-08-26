@@ -1,8 +1,10 @@
-import json
+import asyncio
 import sqlite3
 import time
 from typing import Any
 from app.config import DB_PATH, RECENT_LOGS, log
+
+TELEMETRY_QUEUE: asyncio.Queue[tuple] = asyncio.Queue(maxsize=5000)
 
 
 def db() -> sqlite3.Connection:
@@ -48,6 +50,8 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_created_at ON inference_logs(created_at DESC);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_created_at_model ON inference_logs(created_at, model);")
         conn.commit()
 
 
@@ -82,29 +86,102 @@ def record_telemetry(
     }
     RECENT_LOGS.appendleft(entry)
 
+    row_data = (
+        request_id,
+        model,
+        prompt_tokens,
+        completion_tokens,
+        total_tokens,
+        latency_ms,
+        ttft_ms,
+        tok_per_sec,
+        status,
+        key_prefix,
+        now_ts,
+    )
+
     try:
-        with db() as conn:
-            conn.execute(
-                """
-                INSERT INTO inference_logs (
-                    request_id, model, prompt_tokens, completion_tokens, total_tokens,
-                    latency_ms, ttft_ms, tok_per_sec, status, key_prefix, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    request_id,
-                    model,
-                    prompt_tokens,
-                    completion_tokens,
-                    total_tokens,
-                    latency_ms,
-                    ttft_ms,
-                    tok_per_sec,
-                    status,
-                    key_prefix,
-                    now_ts,
-                ),
-            )
-            conn.commit()
-    except Exception as exc:
-        log.warning("failed to persist inference telemetry: %s", exc)
+        TELEMETRY_QUEUE.put_nowait(row_data)
+    except Exception:
+        # Fallback sync insert if queue is full
+        try:
+            with db() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO inference_logs (
+                        request_id, model, prompt_tokens, completion_tokens, total_tokens,
+                        latency_ms, ttft_ms, tok_per_sec, status, key_prefix, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    row_data,
+                )
+                conn.commit()
+        except Exception as exc:
+            log.warning("failed to persist inference telemetry: %s", exc)
+
+
+async def telemetry_flush_worker():
+    """Background worker to batch-insert telemetry logs from async queue to SQLite."""
+    while True:
+        try:
+            batch = []
+            # Wait for at least one item
+            item = await TELEMETRY_QUEUE.get()
+            batch.append(item)
+            TELEMETRY_QUEUE.task_done()
+
+            # Drain any additional pending items up to 50
+            while len(batch) < 50:
+                try:
+                    item = TELEMETRY_QUEUE.get_nowait()
+                    batch.append(item)
+                    TELEMETRY_QUEUE.task_done()
+                except asyncio.QueueEmpty:
+                    break
+
+            if batch:
+                try:
+                    with db() as conn:
+                        conn.executemany(
+                            """
+                            INSERT INTO inference_logs (
+                                request_id, model, prompt_tokens, completion_tokens, total_tokens,
+                                latency_ms, ttft_ms, tok_per_sec, status, key_prefix, created_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            batch,
+                        )
+                        conn.commit()
+                except Exception as exc:
+                    log.warning("Batch telemetry insertion failed: %s", exc)
+
+            await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            # Drain remaining before stopping
+            remaining = []
+            while not TELEMETRY_QUEUE.empty():
+                try:
+                    remaining.append(TELEMETRY_QUEUE.get_nowait())
+                    TELEMETRY_QUEUE.task_done()
+                except asyncio.QueueEmpty:
+                    break
+            if remaining:
+                try:
+                    with db() as conn:
+                        conn.executemany(
+                            """
+                            INSERT INTO inference_logs (
+                                request_id, model, prompt_tokens, completion_tokens, total_tokens,
+                                latency_ms, ttft_ms, tok_per_sec, status, key_prefix, created_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            remaining,
+                        )
+                        conn.commit()
+                except Exception:
+                    pass
+            break
+        except Exception as exc:
+            log.debug("Telemetry worker loop exception: %s", exc)
+            await asyncio.sleep(1.0)
+

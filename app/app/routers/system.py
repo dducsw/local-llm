@@ -1,8 +1,10 @@
-import httpx
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from app.config import APP_DIR, MODELS
+from app.services.metrics_service import LLM_SSH_TUNNEL_UP, export_prometheus_metrics
+from app.services.tunnel_service import TUNNEL_MANAGER
+
 
 router = APIRouter(tags=["System"])
 
@@ -50,9 +52,18 @@ async def readyz():
     return {"status": "ready", "backends": results}
 
 
+@router.get("/metrics")
+def prometheus_metrics():
+    """Expose Prometheus formatted metrics for scrapers (Grafana/Prometheus)."""
+    LLM_SSH_TUNNEL_UP.set(1 if TUNNEL_MANAGER.is_alive() else 0)
+    data, content_type = export_prometheus_metrics()
+    return Response(content=data, media_type=content_type)
+
+
 @router.get("/", response_class=HTMLResponse)
 def dashboard():
     ui_file = APP_DIR / "ui" / "index.html"
     if ui_file.is_file():
         return HTMLResponse(content=ui_file.read_text(encoding="utf-8"))
     return DASHBOARD_FALLBACK_HTML
+

@@ -70,43 +70,43 @@ python -m pip install --prefer-binary --no-cache-dir \
     torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu128
 
-# 5. Fetch and install 1Cat-vLLM Wheel from GitHub Releases
-echo "[*] Fetching latest 1Cat-vLLM release wheel..."
+# 5. Fetch and install 1Cat-vLLM & FlashAttention-V100 Wheels from GitHub Releases
+echo "[*] Fetching latest 1Cat-vLLM & FlashAttention-V100 release wheels..."
 WHEEL_DIR="./wheels"
 mkdir -p "$WHEEL_DIR"
 
-LATEST_WHEEL_URL=$(curl -s https://api.github.com/repos/1CatAI/1Cat-vLLM/releases/latest | \
-    grep "browser_download_url.*\.whl" | head -n 1 | cut -d '"' -f 4 || true)
+WHEEL_URLS=$(curl -s https://api.github.com/repos/1CatAI/1Cat-vLLM/releases/latest | \
+    grep "browser_download_url.*\.whl" | cut -d '"' -f 4 || true)
 
-if [ -n "$LATEST_WHEEL_URL" ]; then
-    WHEEL_NAME=$(basename "$LATEST_WHEEL_URL")
-    TARGET_WHEEL="$WHEEL_DIR/$WHEEL_NAME"
-    
-    if [ ! -f "$TARGET_WHEEL" ]; then
-        echo "[*] Downloading wheel: $WHEEL_NAME..."
-        curl -L "$LATEST_WHEEL_URL" -o "$TARGET_WHEEL"
-    else
-        echo "[✓] Wheel already cached at $TARGET_WHEEL"
-    fi
+if [ -n "$WHEEL_URLS" ]; then
+    for url in $WHEEL_URLS; do
+        wheel_file="$WHEEL_DIR/$(basename "$url")"
+        if [ ! -f "$wheel_file" ]; then
+            echo "[*] Downloading wheel: $(basename "$url")..."
+            curl -L "$url" -o "$wheel_file"
+        else
+            echo "[✓] Wheel already cached at $wheel_file"
+        fi
+    done
 
-    echo "[*] Installing 1Cat-vLLM wheel..."
+    echo "[*] Installing 1Cat-vLLM wheels..."
     python -m pip install --prefer-binary --no-cache-dir \
         --extra-index-url https://download.pytorch.org/whl/cu128 \
-        "$TARGET_WHEEL"
+        "$WHEEL_DIR"/*.whl
 else
-    echo "[!] Could not automatically fetch latest release wheel URL via GitHub API."
-    echo "[*] Attempting direct pip install or check local ./wheels directory..."
-    if ls "$WHEEL_DIR"/1cat_vllm*.whl 1> /dev/null 2>&1; then
+    echo "[!] Could not automatically fetch latest release wheel URLs via GitHub API."
+    echo "[*] Attempting to install from local ./wheels directory..."
+    if ls "$WHEEL_DIR"/*.whl 1> /dev/null 2>&1; then
         python -m pip install --prefer-binary --no-cache-dir \
             --extra-index-url https://download.pytorch.org/whl/cu128 \
-            "$WHEEL_DIR"/1cat_vllm*.whl
+            "$WHEEL_DIR"/*.whl
     else
-        echo "[*] Installing huggingface-hub and auxiliary utilities..."
+        echo "[*] Installing auxiliary utilities..."
         python -m pip install --no-cache-dir huggingface-hub hf-transfer openai
         echo "=========================================================="
-        echo "Please manually download the .whl from:"
+        echo "Please manually download the .whl files from:"
         echo "  https://github.com/1CatAI/1Cat-vLLM/releases/latest"
-        echo "Place it in $PWD/$WHEEL_DIR and rerun this script."
+        echo "Place them in $PWD/$WHEEL_DIR and rerun this script."
         echo "=========================================================="
         exit 1
     fi

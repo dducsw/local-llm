@@ -22,12 +22,20 @@ mkdir -p "$PROJECT_DIR/logs"
 
 # Environment / Execution Mode Configuration
 USE_APPTAINER="${USE_APPTAINER:-0}"
-APPTAINER_IMAGE="${APPTAINER_IMAGE:-/home/ducledinh/dev/container/1cat-vllm.sif}"
+DEFAULT_IMAGE="$PROJECT_DIR/build/1cat-vllm.sif"
+if [ ! -f "$DEFAULT_IMAGE" ] && [ -f "$HOME/dev/container/1cat-vllm.sif" ]; then
+    DEFAULT_IMAGE="$HOME/dev/container/1cat-vllm.sif"
+fi
+APPTAINER_IMAGE="${APPTAINER_IMAGE:-$DEFAULT_IMAGE}"
 CONDA_ENV="${CONDA_ENV:-1cat-vllm-sm70}"
 CONDA_DIR="${CONDA_DIR:-$HOME/miniconda3}"
 
 # Model & Serving Parameters
-MODEL_PATH="${MODEL_PATH:-/home/ducledinh/dev/models/Qwen3.5-9B-AWQ-INT4}"
+DEFAULT_MODEL="$PROJECT_DIR/../models/Qwen3.5-9B-AWQ-INT4"
+if [ ! -d "$DEFAULT_MODEL" ] && [ -d "$HOME/dev/models/Qwen3.5-9B-AWQ-INT4" ]; then
+    DEFAULT_MODEL="$HOME/dev/models/Qwen3.5-9B-AWQ-INT4"
+fi
+MODEL_PATH="${MODEL_PATH:-$DEFAULT_MODEL}"
 MODEL_ALIAS="${MODEL_ALIAS:-qwen3.5-9b}"
 PORT="${PORT:-8000}"
 TP="${TP:-1}"
@@ -42,7 +50,7 @@ export NVIDIA_TF32_OVERRIDE=0
 export NCCL_P2P_DISABLE=1
 
 # Clean shutdown handler
-ENDPOINT_FILE="$PROJECT_DIR/logs/endpoint-$SLURM_JOB_ID.json"
+ENDPOINT_FILE="$PROJECT_DIR/logs/endpoint-${SLURM_JOB_ID:-local}.json"
 cleanup() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Shutdown signal received. Terminating vLLM server..."
     rm -f "$ENDPOINT_FILE"
@@ -59,7 +67,7 @@ if [ ! -e "$MODEL_PATH" ] && [ ! -d "$MODEL_PATH" ]; then
     echo "=========================================================="
     echo "ERROR: Model not found at: $MODEL_PATH"
     echo "Please download the model first using download_model.sh:"
-    echo "  ./download_model.sh /home/ducledinh/dev/models"
+    echo "  ./download_model.sh $HOME/dev/models"
     echo "=========================================================="
     exit 1
 fi

@@ -10,31 +10,65 @@ from app.config import (
     HPC_SSH_USER,
     log,
 )
+from app.services.metrics_service import LLM_SSH_TUNNEL_UP
 from app.services.slurm_service import run_slurm_cli, run_slurm_cli_async
 
 
 class SSHTunnelManager:
-    """Manages background SSH port-forwarding tunnel from VM Gateway to HPC Compute Node."""
+    """Manages background SSH port-forwarding tunnel from VM Gateway to HPC Cluster."""
 
     def __init__(self):
         self.process: subprocess.Popen | None = None
         self.target_node: str = ""
+        self.job_id: str = ""
         self.local_port: int = int(os.getenv("TUNNEL_LOCAL_PORT", "18000"))
-        self.remote_port: int = int(os.getenv("TUNNEL_REMOTE_PORT", "8000"))
+        self.remote_port: int = int(os.getenv("TUNNEL_REMOTE_PORT", "18000"))
         self.status: str = "STOPPED"
         self.last_error: str = ""
         self.connected_at: float = 0.0
+        LLM_SSH_TUNNEL_UP.set(0)
 
     def is_alive(self) -> bool:
         if self.process is not None:
             if self.process.poll() is None:
+                LLM_SSH_TUNNEL_UP.set(1)
                 return True
             self.process = None
             if self.status == "RUNNING":
                 self.status = "DISCONNECTED"
+        LLM_SSH_TUNNEL_UP.set(0)
         return False
 
-    def start(self, target_node: str = "", local_port: int | None = None, remote_port: int | None = None) -> bool:
+    def _ensure_remote_reverse_tunnel(self, job_id: str, target_node: str, remote_port: int):
+        """Ensure the compute node running the Slurm job is reverse-tunneling port 8000 to headnode:remote_port."""
+        if not HPC_SSH_HOST or not job_id:
+            return
+        try:
+            # Check if reverse tunnel is already active on headnode
+            check_cmd = f"curl -s -m 1 http://127.0.0.1:{remote_port}/health >/dev/null 2>&1 || curl -s -m 1 http://127.0.0.1:{remote_port}/v1/models >/dev/null 2>&1"
+            res = run_slurm_cli(["bash", "-c", check_cmd], timeout=3.0, remote_only=True)
+            if res[0] == 0:
+                log.info("HPC reverse tunnel to %s on port %s is already active.", target_node, remote_port)
+                return
+
+            log.info("Starting background reverse SSH tunnel for Slurm job %s (%s) on HPC headnode...", job_id, target_node)
+            launch_cmd = (
+                f"setsid srun --jobid={job_id} --overlap "
+                f"ssh -N -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=15 "
+                f"-R {remote_port}:127.0.0.1:8000 {HPC_SSH_HOST} </dev/null >/dev/null 2>&1 &"
+            )
+            run_slurm_cli(["bash", "-c", launch_cmd], timeout=5.0, remote_only=True)
+            time.sleep(0.8)
+        except Exception as exc:
+            log.warning("Could not auto-start HPC reverse tunnel via srun: %s", exc)
+
+    def start(
+        self,
+        target_node: str = "",
+        job_id: str = "",
+        local_port: int | None = None,
+        remote_port: int | None = None,
+    ) -> bool:
         if not HPC_SSH_HOST or HPC_SSH_HOST == "your-host":
             self.status = "ERROR"
             self.last_error = "HPC_SSH_HOST is not configured"
@@ -44,19 +78,24 @@ class SSHTunnelManager:
         rp = remote_port or self.remote_port
         node = target_node.strip() if target_node else "127.0.0.1"
 
+        if job_id:
+            self._ensure_remote_reverse_tunnel(job_id, node, rp)
+
         if self.is_alive() and self.target_node == node and self.local_port == lp:
             return True
 
         self.stop()
 
         self.target_node = node
+        self.job_id = job_id
         self.local_port = lp
         self.remote_port = rp
         self.status = "STARTING"
         self.last_error = ""
 
-        forward_target = f"{node}:{rp}" if node and node not in ("localhost", "127.0.0.1", "") else f"127.0.0.1:{rp}"
-        forward_rule = f"{lp}:{forward_target}"
+        # The compute node reverses port 8000 to headnode:rp (127.0.0.1:18000).
+        # We forward Gateway local_port -> headnode:127.0.0.1:rp
+        forward_rule = f"{lp}:127.0.0.1:{rp}"
 
         cmd = [
             "ssh",
@@ -94,16 +133,19 @@ class SSHTunnelManager:
 
             self.status = "RUNNING"
             self.connected_at = time.time()
-            log.info("SSH tunnel established: 127.0.0.1:%s -> %s:%s via %s", lp, node, rp, target)
+            LLM_SSH_TUNNEL_UP.set(1)
+            log.info("SSH tunnel established: 127.0.0.1:%s -> %s via %s (target node: %s)", lp, forward_rule, target, node)
             return True
         except Exception as exc:
             self.status = "ERROR"
             self.last_error = str(exc)
+            LLM_SSH_TUNNEL_UP.set(0)
             log.error("Exception starting SSH tunnel: %s", exc)
             self.process = None
             return False
 
     def stop(self):
+        LLM_SSH_TUNNEL_UP.set(0)
         if self.process is not None:
             try:
                 log.info("Terminating SSH tunnel to %s", self.target_node)
@@ -125,6 +167,7 @@ class SSHTunnelManager:
             "status": "RUNNING" if alive else self.status,
             "alive": alive,
             "target_node": self.target_node,
+            "job_id": self.job_id,
             "local_port": self.local_port,
             "remote_port": self.remote_port,
             "connected_at": self.connected_at,
@@ -147,18 +190,21 @@ async def auto_tunnel_monitor_loop():
                 code, stdout, _ = await run_slurm_cli_async(cmd, timeout=5.0)
                 if code == 0 and stdout:
                     running_node = None
+                    running_job_id = None
                     for line in stdout.strip().splitlines():
                         parts = line.strip().split("|")
                         if len(parts) >= 6:
                             job_status = parts[3].strip().upper()
                             job_node = parts[5].strip()
+                            job_id = parts[0].strip()
                             if job_status == "RUNNING" and job_node and not job_node.startswith("("):
                                 running_node = job_node
+                                running_job_id = job_id
                                 break
                     if running_node:
                         if not TUNNEL_MANAGER.is_alive() or TUNNEL_MANAGER.target_node != running_node:
-                            log.info("Auto-Tunnel: Active Slurm node '%s' detected, connecting tunnel...", running_node)
-                            TUNNEL_MANAGER.start(target_node=running_node)
+                            log.info("Auto-Tunnel: Active Slurm node '%s' (Job %s) detected, connecting tunnel...", running_node, running_job_id)
+                            TUNNEL_MANAGER.start(target_node=running_node, job_id=running_job_id or "")
         except Exception as exc:
             log.debug("Auto-tunnel loop check exception: %s", exc)
         await asyncio.sleep(10)
@@ -176,7 +222,8 @@ async def watch_and_tunnel_job(job_id: str):
             node = parts[1].strip() if len(parts) > 1 else ""
             if status == "RUNNING" and node and not node.startswith("("):
                 log.info("Job %s is now RUNNING on node %s. Establishing tunnel immediately.", job_id, node)
-                TUNNEL_MANAGER.start(target_node=node)
+                TUNNEL_MANAGER.start(target_node=node, job_id=str(job_id))
                 break
             elif status in ("FAILED", "CANCELLED", "COMPLETED"):
                 break
+

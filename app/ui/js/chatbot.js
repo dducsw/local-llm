@@ -23,24 +23,26 @@ async function fetchAvailableModels() {
         const playSelect = document.getElementById('play-model-select');
         const chatSelect = document.getElementById('chat-model-select');
         const pageKeySelect = document.getElementById('page-key-model');
-        const globalTitle = document.getElementById('global-model-title');
+        const globalLabel = document.getElementById('global-model-selected-label');
+        const metricModelName = document.getElementById('metric-model-name');
         const globalCount = document.getElementById('model-dropdown-count');
         const globalList = document.getElementById('global-model-items-list');
 
         if (models.length > 0) {
-            currentSelectedModel = models[0].id;
-            if (globalTitle) globalTitle.innerText = models[0].id;
+            currentSelectedModel = currentSelectedModel || models[0].id;
+            if (globalLabel) globalLabel.innerText = currentSelectedModel;
+            if (metricModelName) metricModelName.innerText = currentSelectedModel;
             if (globalCount) globalCount.innerText = models.length;
 
             if (playSelect) {
                 playSelect.innerHTML = models.map(m => `
-                    <option value="${m.id}">${m.id} (${(m.status || 'READY').toUpperCase()})</option>
+                    <option value="${m.id}" ${m.id === currentSelectedModel ? 'selected' : ''}>${m.id} (${(m.status || 'READY').toUpperCase()})</option>
                 `).join('');
             }
 
             if (chatSelect) {
                 chatSelect.innerHTML = models.map(m => `
-                    <option value="${m.id}">${m.id}</option>
+                    <option value="${m.id}" ${m.id === currentSelectedModel ? 'selected' : ''}>${m.id}</option>
                 `).join('');
                 chatSelect.value = currentSelectedModel;
             }
@@ -55,14 +57,14 @@ async function fetchAvailableModels() {
 
             if (globalList) {
                 globalList.innerHTML = models.map(m => `
-                    <div onclick="selectGlobalModel('${m.id}')"
-                        class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer flex items-center justify-between text-xs transition-colors">
-                        <div>
-                            <span class="font-bold text-slate-800 dark:text-slate-100 font-mono block">${m.id}</span>
-                            <span class="text-[10px] text-slate-400 font-mono">${m.owned_by || 'vLLM Engine'}</span>
+                    <div onclick="selectGlobalModel('${m.id}')" data-model-id="${m.id}"
+                        class="p-2.5 rounded-xl border border-transparent ${m.id === currentSelectedModel ? 'bg-neon-500/10 border-neon-500/30' : 'hover:bg-slate-100 dark:hover:bg-slate-800/80'} cursor-pointer flex items-center justify-between text-xs transition-all">
+                        <div class="truncate mr-2">
+                            <span class="font-bold text-slate-800 dark:text-slate-100 font-mono block truncate">${m.id}</span>
+                            <span class="text-[10px] text-slate-400 font-mono block truncate">${m.owned_by || 'vLLM Engine'}</span>
                         </div>
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
-                            ${(m.status || 'SERVING').toUpperCase()}
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono shrink-0 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                            ${(m.status || 'ONLINE').toUpperCase()}
                         </span>
                     </div>
                 `).join('');
@@ -344,9 +346,9 @@ async function sendChatMessage() {
     input.value = '';
     appendChatMessage('user', text);
 
-    const sysPrompt = document.getElementById('chat-system-prompt')?.value.trim() || '';
+    const sysPrompt = document.getElementById('chat-system-prompt')?.value.trim() || 'You are a helpful, direct, and concise AI assistant.';
     const temp = parseFloat(document.getElementById('chat-temp')?.value) || 0.7;
-    const maxTokens = parseInt(document.getElementById('chat-tokens')?.value, 10) || 1024;
+    const maxTokens = parseInt(document.getElementById('chat-tokens')?.value, 10) || 2048;
 
     const sendBtn = document.getElementById('chat-send-btn');
     const stopBtn = document.getElementById('chat-stop-btn');
@@ -354,7 +356,9 @@ async function sendChatMessage() {
     if (stopBtn) stopBtn.classList.remove('hidden');
 
     const assistantBubble = appendChatMessage('assistant', '...');
-    let fullAssistantResponse = '';
+    let fullContent = '';
+    let fullReasoning = '';
+    let rawAccumulatedContent = '';
     let tokenCount = 0;
     const startTime = performance.now();
 
@@ -363,6 +367,53 @@ async function sendChatMessage() {
     const messagesPayload = [];
     if (sysPrompt) messagesPayload.push({ role: 'system', content: sysPrompt });
     conversationHistory.forEach(msg => messagesPayload.push(msg));
+
+    let streamDone = false;
+    let renderScheduled = false;
+    function scheduleRender(isFinal = false) {
+        if (isFinal) {
+            streamDone = true;
+            renderBubble();
+            return;
+        }
+        if (renderScheduled) return;
+        renderScheduled = true;
+        requestAnimationFrame(() => {
+            renderBubble();
+            renderScheduled = false;
+        });
+    }
+
+    function renderBubble() {
+        if (!assistantBubble) return;
+        let html = '';
+        if (fullReasoning) {
+            const isThinking = !streamDone && !fullContent;
+            html += `
+                <details ${isThinking || !fullContent ? 'open' : ''} class="mb-3 select-none group">
+                    <summary class="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors py-0.5 cursor-pointer list-none flex items-center gap-1.5">
+                        <span class="text-xs transform transition-transform group-open:rotate-90 inline-block text-slate-400">▶</span>
+                        <span class="${isThinking ? 'text-purple-600 dark:text-purple-400 font-semibold animate-pulse' : 'text-slate-500 font-medium'}">
+                            ${isThinking ? 'Thinking...' : 'Thought process'}
+                        </span>
+                    </summary>
+                    <div class="mt-1.5 pl-3 border-l-2 border-purple-400 dark:border-purple-700 text-[11px] text-slate-600 dark:text-slate-300 font-mono whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
+                        ${escapeHtml(fullReasoning)}
+                    </div>
+                </details>
+            `;
+        }
+        if (fullContent) {
+            html += formatMarkdownText(fullContent);
+        } else if (!fullReasoning) {
+            html += '<span class="animate-pulse text-slate-400">...</span>';
+        } else if (streamDone && !fullContent) {
+            html += '<div class="text-[12px] text-slate-400 italic mt-1">(Thinking completed)</div>';
+        }
+        assistantBubble.innerHTML = html;
+        const container = document.getElementById('chat-messages-container');
+        if (container) container.scrollTop = container.scrollHeight;
+    }
 
     try {
         const authKey = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || activeApiKey || 'admin123';
@@ -385,7 +436,7 @@ async function sendChatMessage() {
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({ error: { message: 'HTTP Error ' + res.status } }));
-            throw new Error(err.detail?.error?.message || err.error?.message || 'Chat generation error');
+            throw new Error(err.detail?.error?.message || err.detail || err.error?.message || 'Chat generation error');
         }
 
         if (assistantBubble) assistantBubble.textContent = '';
@@ -394,17 +445,32 @@ async function sendChatMessage() {
         if (contentType.includes('application/json')) {
             const data = await res.json();
             const msg = data.choices?.[0]?.message || {};
-            fullAssistantResponse = msg.content || msg.reasoning_content || '';
-            if (assistantBubble) {
-                assistantBubble.innerHTML = formatMarkdownText(fullAssistantResponse);
+            let rawContent = msg.content || '';
+            fullReasoning = msg.reasoning_content || '';
+
+            if (rawContent.includes('<think>')) {
+                const s = rawContent.indexOf('<think>');
+                const e = rawContent.indexOf('</think>');
+                if (e !== -1) {
+                    fullReasoning = (fullReasoning ? fullReasoning + '\n' : '') + rawContent.slice(s + 7, e).trim();
+                    fullContent = (rawContent.slice(0, s) + rawContent.slice(e + 8)).trimStart();
+                } else {
+                    fullReasoning = (fullReasoning ? fullReasoning + '\n' : '') + rawContent.slice(s + 7).trim();
+                    fullContent = rawContent.slice(0, s);
+                }
+            } else {
+                fullContent = rawContent;
             }
+
+            scheduleRender(true);
+
             const elapsed = (performance.now() - startTime) / 1000;
             const completionTokens = data.usage?.completion_tokens || 10;
             const speed = (completionTokens / (elapsed || 1)).toFixed(1);
             const liveSpeed = document.getElementById('chat-live-speed');
             if (liveSpeed) liveSpeed.innerText = speed;
 
-            conversationHistory.push({ role: 'assistant', content: fullAssistantResponse });
+            conversationHistory.push({ role: 'assistant', content: fullContent || fullReasoning });
             return;
         }
 
@@ -429,33 +495,55 @@ async function sendChatMessage() {
                 try {
                     const parsed = JSON.parse(dataStr);
                     const delta = parsed.choices?.[0]?.delta;
-                    const chunk = delta?.content || delta?.reasoning_content || '';
-                    if (chunk) {
-                        fullAssistantResponse += chunk;
-                        if (assistantBubble) {
-                            assistantBubble.innerHTML = formatMarkdownText(fullAssistantResponse);
+                    if (delta) {
+                        if (delta.reasoning_content) {
+                            fullReasoning += delta.reasoning_content;
+                            tokenCount++;
                         }
-                        tokenCount++;
+                        if (delta.content) {
+                            rawAccumulatedContent += delta.content;
+                            tokenCount++;
+
+                            // Automatically parse inline <think>...</think> tags if model emits them in content
+                            if (rawAccumulatedContent.includes('<think>')) {
+                                const thinkStart = rawAccumulatedContent.indexOf('<think>');
+                                const thinkEnd = rawAccumulatedContent.indexOf('</think>');
+                                if (thinkEnd !== -1) {
+                                    // Finished thinking, separate thought & main response
+                                    const extractedThought = rawAccumulatedContent.slice(thinkStart + 7, thinkEnd).trim();
+                                    fullReasoning = (fullReasoning && !fullReasoning.includes(extractedThought)) ? (fullReasoning + '\n' + extractedThought) : extractedThought;
+                                    fullContent = (rawAccumulatedContent.slice(0, thinkStart) + rawAccumulatedContent.slice(thinkEnd + 8)).trimStart();
+                                } else {
+                                    // Still thinking inside <think> tag
+                                    fullReasoning = rawAccumulatedContent.slice(thinkStart + 7);
+                                    fullContent = rawAccumulatedContent.slice(0, thinkStart);
+                                }
+                            } else {
+                                fullContent = rawAccumulatedContent;
+                            }
+                        }
+                        scheduleRender(false);
 
                         const elapsed = (performance.now() - startTime) / 1000;
-                        const speed = (tokenCount / elapsed).toFixed(1);
-                        const liveSpeed = document.getElementById('chat-live-speed');
-                        if (liveSpeed) liveSpeed.innerText = speed;
-
-                        const container = document.getElementById('chat-messages-container');
-                        if (container) container.scrollTop = container.scrollHeight;
+                        if (elapsed > 0) {
+                            const speed = (tokenCount / elapsed).toFixed(1);
+                            const liveSpeed = document.getElementById('chat-live-speed');
+                            if (liveSpeed) liveSpeed.innerText = speed;
+                        }
                     }
                 } catch (e) { }
             }
         }
 
-        conversationHistory.push({ role: 'assistant', content: fullAssistantResponse });
+        scheduleRender(true);
+        conversationHistory.push({ role: 'assistant', content: fullContent || fullReasoning });
 
     } catch (err) {
         if (err.name === 'AbortError') {
-            if (assistantBubble) assistantBubble.innerHTML += '<br><em class="text-slate-400">[Response generation stopped]</em>';
+            scheduleRender(true);
+            if (assistantBubble) assistantBubble.innerHTML += '<div class="mt-2 text-slate-400 italic text-[11px]">⏹️ Response generation stopped by user.</div>';
         } else {
-            if (assistantBubble) assistantBubble.innerHTML = `<span class="text-rose-500 font-bold">Error: ${err.message}</span>`;
+            if (assistantBubble) assistantBubble.innerHTML = `<span class="text-rose-500 font-bold">Error: ${escapeHtml(err.message)}</span>`;
         }
     } finally {
         if (sendBtn) sendBtn.classList.remove('hidden');

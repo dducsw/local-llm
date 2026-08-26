@@ -77,20 +77,38 @@ function toggleModelDropdown(event) {
 }
 
 function selectGlobalModel(modelId) {
-    const title = document.getElementById('global-model-title');
-    const badge = document.getElementById('global-model-badge');
+    if (!modelId) return;
+    currentSelectedModel = modelId;
+
+    const label = document.getElementById('global-model-selected-label');
+    const metricName = document.getElementById('metric-model-name');
     const playSelect = document.getElementById('play-model-select');
     const chatSelect = document.getElementById('chat-model-select');
 
-    if (title) title.innerText = modelId;
-    if (badge) badge.innerText = 'ONLINE';
+    if (label) label.innerText = modelId;
+    if (metricName) metricName.innerText = modelId;
     if (playSelect) playSelect.value = modelId;
     if (chatSelect) chatSelect.value = modelId;
+
+    if (typeof updateChatModelDisplay === 'function') updateChatModelDisplay(modelId);
     if (typeof onGlobalModelFilterChange === 'function') onGlobalModelFilterChange(modelId);
 
     const menu = document.getElementById('global-model-dropdown-menu');
+    const chevron = document.getElementById('model-dropdown-chevron');
     if (menu) menu.classList.add('hidden');
-    showToast(`Active target model set to ${modelId}`, 'info');
+    if (chevron) chevron.classList.remove('rotate-180');
+
+    // Highlight active model in dropdown list
+    const items = document.querySelectorAll('#global-model-items-list > div');
+    items.forEach(el => {
+        if (el.getAttribute('data-model-id') === modelId) {
+            el.classList.add('bg-neon-500/10', 'border-neon-500/30');
+        } else {
+            el.classList.remove('bg-neon-500/10', 'border-neon-500/30');
+        }
+    });
+
+    showToast(`Target model set to ${modelId}`, 'info');
 }
 
 function toggleSystemPrompt() {

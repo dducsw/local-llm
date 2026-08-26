@@ -908,9 +908,9 @@
                                 <div>
                                     <div class="flex justify-between items-center mb-1">
                                         <span class="font-bold text-slate-600 dark:text-slate-400">Max Response Tokens</span>
-                                        <span id="chat-val-tokens" class="font-mono text-neon-700 dark:text-neon-400 font-bold">1024</span>
+                                        <span id="chat-val-tokens" class="font-mono text-neon-700 dark:text-neon-400 font-bold">2048</span>
                                     </div>
-                                    <input type="range" id="chat-tokens" min="128" max="2048" step="128" value="1024"
+                                    <input type="range" id="chat-tokens" min="256" max="4096" step="256" value="2048"
                                         oninput="document.getElementById('chat-val-tokens').innerText = this.value"
                                         class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500">
                                 </div>

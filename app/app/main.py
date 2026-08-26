@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import DB_PATH, MODELS, log
-from app.database import init_db
+from app.database import init_db, telemetry_flush_worker
 from app.routers import (
     admin,
     auth,
@@ -12,6 +12,7 @@ from app.routers import (
     system,
     telemetry,
 )
+from app.services.proxy_service import close_upstream_client
 from app.services.tunnel_service import TUNNEL_MANAGER, auto_tunnel_monitor_loop
 
 
@@ -21,13 +22,16 @@ async def lifespan(_: FastAPI):
     init_db()
     log.info("Gateway started. db=%s models=%s", DB_PATH, list(MODELS.keys()))
 
-    # 2. Start background Auto-Tunnel monitor loop for Slurm cluster
+    # 2. Start background tasks (Telemetry batching + Auto-Tunnel monitor loop)
+    telemetry_task = asyncio.create_task(telemetry_flush_worker())
     monitor_task = asyncio.create_task(auto_tunnel_monitor_loop())
 
     yield
 
     # 3. Clean shutdown on server termination
     monitor_task.cancel()
+    telemetry_task.cancel()
+    await close_upstream_client()
     TUNNEL_MANAGER.stop()
     log.info("Gateway shutdown complete.")
 

@@ -42,23 +42,47 @@ def require_admin(
         token_to_check = authorization.split(" ", 1)[1].strip()
 
     if not token_to_check:
-        raise HTTPException(status_code=401, detail="Administrator authentication required")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": {
+                    "message": "Administrator authentication required",
+                    "type": "authentication_error",
+                }
+            },
+        )
 
-    # Check active session token
+    # 1. Check active session token
     if token_to_check in ADMIN_SESSIONS:
         if time.time() < ADMIN_SESSIONS[token_to_check]:
             return
         else:
             ADMIN_SESSIONS.pop(token_to_check, None)
-            raise HTTPException(status_code=401, detail="Administrator session has expired")
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "error": {
+                        "message": "Administrator session has expired",
+                        "type": "authentication_error",
+                    }
+                },
+            )
 
-    # Check direct master password / admin token
+    # 2. Check direct master password / admin token
     if (ADMIN_PASSWORD and secrets.compare_digest(token_to_check, ADMIN_PASSWORD)) or (
         ADMIN_TOKEN and secrets.compare_digest(token_to_check, ADMIN_TOKEN)
     ):
         return
 
-    raise HTTPException(status_code=401, detail="Invalid administrator authentication credentials")
+    raise HTTPException(
+        status_code=401,
+        detail={
+            "error": {
+                "message": "Invalid administrator authentication credentials",
+                "type": "authentication_error",
+            }
+        },
+    )
 
 
 def require_api_key(
@@ -75,15 +99,19 @@ def require_api_key(
         raw = x_admin_token.strip()
 
     if not raw:
-        raw = "admin123"
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": {
+                    "message": "Missing API key in Authorization header (Bearer <api_key>)",
+                    "type": "authentication_error",
+                }
+            },
+        )
 
-    # 1. Allow Admin token / Master Password / Admin Sessions directly
-    if (
-        (ADMIN_PASSWORD and secrets.compare_digest(raw, ADMIN_PASSWORD))
-        or (ADMIN_TOKEN and secrets.compare_digest(raw, ADMIN_TOKEN))
-        or (raw in ADMIN_SESSIONS)
-        or raw.startswith("sess_")
-        or raw in ("admin123", "admin", "sk-hpc-demo")
+    # 1. Check Admin Master Token or valid Admin Session
+    if (ADMIN_PASSWORD and secrets.compare_digest(raw, ADMIN_PASSWORD)) or (
+        ADMIN_TOKEN and secrets.compare_digest(raw, ADMIN_TOKEN)
     ):
         return Identity(
             id=0,
@@ -92,6 +120,27 @@ def require_api_key(
             allowed_models=["*"],
             rpm=10000,
         )
+
+    if raw in ADMIN_SESSIONS:
+        if time.time() < ADMIN_SESSIONS[raw]:
+            return Identity(
+                id=0,
+                prefix="admin",
+                name="Admin Session",
+                allowed_models=["*"],
+                rpm=10000,
+            )
+        else:
+            ADMIN_SESSIONS.pop(raw, None)
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "error": {
+                        "message": "Session expired, please log in again",
+                        "type": "authentication_error",
+                    }
+                },
+            )
 
     # 2. Check Database API Keys
     with db() as conn:
@@ -109,7 +158,7 @@ def require_api_key(
             status_code=401,
             detail={
                 "error": {
-                    "message": "Invalid API key",
+                    "message": "Invalid or inactive API key",
                     "type": "authentication_error",
                 }
             },
