@@ -27,11 +27,21 @@ def init_db() -> None:
                 name TEXT NOT NULL,
                 allowed_models TEXT NOT NULL,
                 rpm INTEGER NOT NULL,
+                created_by TEXT NOT NULL DEFAULT 'admin',
                 enabled INTEGER NOT NULL DEFAULT 1,
-                created_at INTEGER NOT NULL
+                created_at INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+        try:
+            conn.execute("ALTER TABLE api_keys ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0;")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE api_keys ADD COLUMN created_by TEXT NOT NULL DEFAULT 'admin';")
+        except Exception:
+            pass
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS inference_logs (

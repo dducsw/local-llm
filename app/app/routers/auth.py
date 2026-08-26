@@ -39,12 +39,15 @@ def login(body: LoginRequest, request: Request):
         )
 
     session_token = "sess_" + secrets.token_urlsafe(32)
-    ADMIN_SESSIONS[session_token] = time.time() + 86400 * 7  # 7 days session
+    ADMIN_SESSIONS[session_token] = {
+        "expires_at": time.time() + 86400 * 7,
+        "username": body.username,
+    }
 
     return {
         "status": "ok",
         "token": session_token,
-        "username": ADMIN_USERNAME,
+        "username": body.username,
         "expires_in": 86400 * 7,
     }
 
@@ -71,8 +74,12 @@ def auth_me(
         token = authorization.split(" ", 1)[1].strip()
 
     if token:
-        if token in ADMIN_SESSIONS and time.time() < ADMIN_SESSIONS[token]:
-            return {"authenticated": True, "username": ADMIN_USERNAME}
+        if token in ADMIN_SESSIONS:
+            sess = ADMIN_SESSIONS[token]
+            exp = sess["expires_at"] if isinstance(sess, dict) else sess
+            uname = sess.get("username", ADMIN_USERNAME) if isinstance(sess, dict) else ADMIN_USERNAME
+            if time.time() < exp:
+                return {"authenticated": True, "username": uname}
         if (ADMIN_PASSWORD and secrets.compare_digest(token, ADMIN_PASSWORD)) or (
             ADMIN_TOKEN and secrets.compare_digest(token, ADMIN_TOKEN)
         ):

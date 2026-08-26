@@ -19,6 +19,7 @@ class CreateKeyRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     allowed_models: list[str] = Field(default_factory=lambda: ["*"])
     rpm: int = Field(default=60, ge=1, le=100000)
+    duration: str = Field(default="never")
 
 
 class SubmitJobRequest(BaseModel):

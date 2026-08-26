@@ -83,7 +83,7 @@
     </script>
 
     <!-- Custom Modular CSS Stylesheet -->
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=2.6.0">
 </head>
 
 <body class="min-h-full font-sans antialiased bg-slate-50 dark:bg-[#06080d] text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-300">
@@ -1063,17 +1063,28 @@
                                         class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-3">
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <div>
                                         <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1.5">Rate Limit (RPM)</label>
                                         <input type="number" id="page-key-rpm" value="60" min="1" max="10000"
-                                            class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
+                                            class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
                                     </div>
                                     <div>
                                         <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1.5">Allowed Models</label>
                                         <select id="page-key-model"
-                                            class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
+                                            class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
                                             <option value="*">All Models (*)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1.5">Duration</label>
+                                        <select id="page-key-duration"
+                                            class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
+                                            <option value="never" selected>Permanent (No Expiry)</option>
+                                            <option value="1d">1 Day (24 Hours)</option>
+                                            <option value="7d">7 Days (1 Week)</option>
+                                            <option value="30d">30 Days (1 Month)</option>
+                                            <option value="90d">90 Days (3 Months)</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1132,6 +1143,7 @@
                                             <th class="p-3">Client Name</th>
                                             <th class="p-3">Models</th>
                                             <th class="p-3">Limit</th>
+                                            <th class="p-3">Expires</th>
                                             <th class="p-3">Status</th>
                                             <th class="p-3 text-right rounded-r-lg">Action</th>
                                         </tr>
@@ -1228,18 +1240,73 @@
         </div>
     </div>
 
+    <!-- ================= MODAL: VIEW API KEY DETAILS ================= -->
+    <div id="modal-view-key"
+        class="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div
+            class="bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-4 transition-all">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="key" class="w-5 h-5 text-neon-700 dark:text-neon-400"></i>
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white" id="modal-key-title">
+                        API Key Details & Credentials
+                    </h3>
+                </div>
+                <button onclick="closeViewKeyModal()"
+                    class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3.5 text-xs">
+                <div class="grid grid-cols-2 gap-2 text-[11px] p-3 rounded-xl bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 font-mono">
+                    <div>
+                        <span class="text-slate-400 block text-[10px]">Client (Owner)</span>
+                        <span id="modal-key-client" class="font-bold text-slate-800 dark:text-slate-200 truncate block">--</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px]">Allowed Models</span>
+                        <span id="modal-key-models" class="font-bold text-slate-800 dark:text-slate-200 truncate block">--</span>
+                    </div>
+                    <div class="pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+                        <span class="text-slate-400 block text-[10px]">Rate Limit</span>
+                        <span id="modal-key-rpm" class="font-bold text-slate-800 dark:text-slate-200 block">--</span>
+                    </div>
+                    <div class="pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+                        <span class="text-slate-400 block text-[10px]">Expires</span>
+                        <span id="modal-key-expires" class="font-bold text-slate-800 dark:text-slate-200 block">--</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Quick cURL Command</label>
+                    <div class="relative">
+                        <pre id="modal-key-curl" class="p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-[10px] overflow-x-auto whitespace-pre leading-relaxed select-all"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button onclick="closeViewKeyModal()"
+                    class="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111827] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold uppercase text-xs transition-colors">
+                    Close Details
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification Container -->
     <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
     <!-- ========================================================================= -->
     <!-- 3. JAVASCRIPT CONTROLLER MODULES                                          -->
     <!-- ========================================================================= -->
-    <script src="js/app.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/telemetry.js"></script>
-    <script src="js/slurm.js"></script>
-    <script src="js/keys.js"></script>
-    <script src="js/chatbot.js"></script>
+    <script src="js/app.js?v=2.6.0"></script>
+    <script src="js/auth.js?v=2.6.0"></script>
+    <script src="js/telemetry.js?v=2.6.0"></script>
+    <script src="js/slurm.js?v=2.6.0"></script>
+    <script src="js/keys.js?v=2.6.0"></script>
+    <script src="js/chatbot.js?v=2.6.0"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             updateThemeIcons();
@@ -1247,6 +1314,7 @@
             if (typeof fetchRealtimeMetrics === 'function') fetchRealtimeMetrics();
             if (typeof fetchTimeseriesMetrics === 'function') fetchTimeseriesMetrics();
             if (typeof fetchAvailableModels === 'function') fetchAvailableModels();
+            if (typeof fetchApiKeys === 'function') fetchApiKeys();
             if (window.lucide) lucide.createIcons();
 
             syncIntervals.push(setInterval(() => {

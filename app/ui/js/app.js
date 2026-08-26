@@ -149,6 +149,24 @@ function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
 
+    if (typeof message === 'object' && message !== null) {
+        if (message.error && typeof message.error === 'object') {
+            message = message.error.message || JSON.stringify(message.error);
+        } else if (message.detail) {
+            if (typeof message.detail === 'string') {
+                message = message.detail;
+            } else if (message.detail.error && message.detail.error.message) {
+                message = message.detail.error.message;
+            } else {
+                message = JSON.stringify(message.detail);
+            }
+        } else if (message.message) {
+            message = message.message;
+        } else {
+            message = JSON.stringify(message);
+        }
+    }
+
     const toast = document.createElement('div');
     const id = 'toast-' + Date.now();
     toast.id = id;
@@ -261,4 +279,15 @@ async function copyToClipboard(text, message = 'Copied to clipboard!') {
     } catch (err) {
         showToast('Failed to copy', 'error');
     }
+}
+
+// Global HTML Escaper
+function escapeHtml(text) {
+    if (!text && text !== 0) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }

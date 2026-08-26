@@ -156,13 +156,14 @@ cp .env.example .env
 cd app
 ./scripts/run.sh
 ```
-Open **`http://127.0.0.1:9000`** in your browser to access the **vLLMlocal** console.
+Open **`http://127.0.0.1:9001`** (or your public domain **`https://llm.ledinhduc.id.vn`**) in your browser to access the **vLLMlocal** console.
 
 ---
 
 ## 📚 Documentation Index
 
-- [REST API Specifications](file:///d:/Projects/local-llm/docs/api-descriptions.md)
-- [Gateway & Dashboard User Guide](file:///d:/Projects/local-llm/docs/api-gateway.md)
-- [Architecture & Technical Design](file:///d:/Projects/local-llm/docs/architecture.md)
-- [HPC Infrastructure & Slurm Guide](file:///d:/Projects/local-llm/docs/infrastructure-deployment.md)
+- [API Keys & Model ACL Guide](file:///home/dev/local-llm/docs/api_acl.md)
+- [REST API Specifications](file:///home/dev/local-llm/docs/api-descriptions.md)
+- [Gateway & Dashboard User Guide](file:///home/dev/local-llm/docs/api-gateway.md)
+- [Architecture & Technical Design](file:///home/dev/local-llm/docs/architecture.md)
+- [HPC Infrastructure & Slurm Guide](file:///home/dev/local-llm/docs/infrastructure-deployment.md)

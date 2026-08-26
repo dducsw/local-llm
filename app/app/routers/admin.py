@@ -3,7 +3,7 @@ import secrets
 import time
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.config import MODELS, RECENT_LOGS
+from app.config import load_models, RECENT_LOGS
 from app.database import db
 from app.schemas import CreateKeyRequest
 from app.services.auth_service import require_admin, sha256
@@ -15,19 +15,30 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)], tags=
 
 @router.post("/keys")
 def create_key(body: CreateKeyRequest):
+    available_models = load_models()
     for m in body.allowed_models:
-        if m != "*" and m not in MODELS:
+        if m != "*" and m not in available_models:
             raise HTTPException(status_code=400, detail=f"Unknown model: {m}")
 
     raw = "sk-hpc-" + secrets.token_urlsafe(32)
     prefix = raw[:16]
+    now = int(time.time())
+
+    # Calculate expiration timestamp based on duration
+    durations = {
+        "1d": 86400,
+        "7d": 7 * 86400,
+        "30d": 30 * 86400,
+        "90d": 90 * 86400,
+    }
+    expires_at = now + durations[body.duration] if body.duration in durations else 0
 
     with db() as conn:
         cur = conn.execute(
             """
             INSERT INTO api_keys
-                (key_hash, prefix, name, allowed_models, rpm, enabled, created_at)
-            VALUES (?, ?, ?, ?, ?, 1, ?)
+                (key_hash, prefix, name, allowed_models, rpm, created_by, enabled, created_at, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
             """,
             (
                 sha256(raw),
@@ -35,7 +46,9 @@ def create_key(body: CreateKeyRequest):
                 body.name,
                 json.dumps(body.allowed_models),
                 body.rpm,
-                int(time.time()),
+                current_user,
+                now,
+                expires_at,
             ),
         )
         conn.commit()
@@ -48,19 +61,45 @@ def create_key(body: CreateKeyRequest):
         "name": body.name,
         "allowed_models": body.allowed_models,
         "rpm": body.rpm,
+        "created_by": current_user,
+        "expires_at": expires_at,
         "note": "Save this key now. The raw key is not stored and cannot be shown again.",
     }
 
 
 @router.get("/keys")
-def list_keys():
+def list_keys(current_user: str = Depends(require_admin)):
+    now = int(time.time())
     with db() as conn:
-        rows = conn.execute(
+        if current_user == "admin":
+            query = """
+                SELECT k.id, k.prefix, k.name, k.allowed_models, k.rpm,
+                       COALESCE(k.created_by, 'admin') as created_by,
+                       k.enabled, k.created_at,
+                       COALESCE(k.expires_at, 0) as expires_at,
+                       COUNT(l.id) as usage_requests,
+                       COALESCE(SUM(l.total_tokens), 0) as usage_tokens
+                FROM api_keys k
+                LEFT JOIN inference_logs l ON l.key_prefix = k.prefix
+                GROUP BY k.id
+                ORDER BY k.id DESC
             """
-            SELECT id, prefix, name, allowed_models, rpm, enabled, created_at
-            FROM api_keys ORDER BY id DESC
+            rows = conn.execute(query).fetchall()
+        else:
+            query = """
+                SELECT k.id, k.prefix, k.name, k.allowed_models, k.rpm,
+                       COALESCE(k.created_by, 'admin') as created_by,
+                       k.enabled, k.created_at,
+                       COALESCE(k.expires_at, 0) as expires_at,
+                       COUNT(l.id) as usage_requests,
+                       COALESCE(SUM(l.total_tokens), 0) as usage_tokens
+                FROM api_keys k
+                LEFT JOIN inference_logs l ON l.key_prefix = k.prefix
+                WHERE COALESCE(k.created_by, 'admin') = ?
+                GROUP BY k.id
+                ORDER BY k.id DESC
             """
-        ).fetchall()
+            rows = conn.execute(query, (current_user,)).fetchall()
 
     return {
         "data": [
@@ -70,22 +109,50 @@ def list_keys():
                 "name": r["name"],
                 "allowed_models": json.loads(r["allowed_models"]),
                 "rpm": r["rpm"],
+                "created_by": r["created_by"],
                 "enabled": bool(r["enabled"]),
                 "created_at": r["created_at"],
+                "expires_at": r["expires_at"],
+                "is_expired": bool(r["expires_at"] > 0 and now > r["expires_at"]),
+                "usage_requests": r["usage_requests"],
+                "usage_tokens": r["usage_tokens"],
             }
             for r in rows
         ]
     }
 
 
-@router.delete("/keys/{key_id}")
-def revoke_key(key_id: int):
+@router.post("/keys/{key_id}/toggle")
+def toggle_key(key_id: int, current_user: str = Depends(require_admin)):
     with db() as conn:
-        cur = conn.execute("UPDATE api_keys SET enabled = 0 WHERE id = ?", (key_id,))
+        row = conn.execute(
+            "SELECT enabled, COALESCE(created_by, 'admin') as created_by FROM api_keys WHERE id = ?",
+            (key_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Key not found")
+        if current_user != "admin" and row["created_by"] != current_user:
+            raise HTTPException(status_code=403, detail="You do not have permission to modify this key")
+        new_state = 0 if row["enabled"] else 1
+        conn.execute("UPDATE api_keys SET enabled = ? WHERE id = ?", (new_state, key_id))
         conn.commit()
-    if cur.rowcount == 0:
-        raise HTTPException(status_code=404, detail="Key not found")
-    return {"id": key_id, "revoked": True}
+    return {"id": key_id, "enabled": bool(new_state)}
+
+
+@router.delete("/keys/{key_id}")
+def revoke_key(key_id: int, current_user: str = Depends(require_admin)):
+    with db() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(created_by, 'admin') as created_by FROM api_keys WHERE id = ?",
+            (key_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Key not found")
+        if current_user != "admin" and row["created_by"] != current_user:
+            raise HTTPException(status_code=403, detail="You do not have permission to delete this key")
+        conn.execute("DELETE FROM api_keys WHERE id = ?", (key_id,))
+        conn.commit()
+    return {"id": key_id, "deleted": True, "revoked": True}
 
 
 @router.get("/telemetry")

@@ -36,7 +36,7 @@ def require_admin(
     x_admin_token: str | None = Header(default=None),
     x_admin_session: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
-) -> None:
+) -> str:
     token_to_check = x_admin_session or x_admin_token
     if not token_to_check and authorization and authorization.lower().startswith("bearer "):
         token_to_check = authorization.split(" ", 1)[1].strip()
@@ -54,8 +54,11 @@ def require_admin(
 
     # 1. Check active session token
     if token_to_check in ADMIN_SESSIONS:
-        if time.time() < ADMIN_SESSIONS[token_to_check]:
-            return
+        sess = ADMIN_SESSIONS[token_to_check]
+        exp = sess["expires_at"] if isinstance(sess, dict) else sess
+        username = sess.get("username", "admin") if isinstance(sess, dict) else "admin"
+        if time.time() < exp:
+            return username
         else:
             ADMIN_SESSIONS.pop(token_to_check, None)
             raise HTTPException(
@@ -72,7 +75,7 @@ def require_admin(
     if (ADMIN_PASSWORD and secrets.compare_digest(token_to_check, ADMIN_PASSWORD)) or (
         ADMIN_TOKEN and secrets.compare_digest(token_to_check, ADMIN_TOKEN)
     ):
-        return
+        return "admin"
 
     raise HTTPException(
         status_code=401,
@@ -146,7 +149,7 @@ def require_api_key(
     with db() as conn:
         row = conn.execute(
             """
-            SELECT id, prefix, name, allowed_models, rpm
+            SELECT id, prefix, name, allowed_models, rpm, COALESCE(expires_at, 0) as expires_at
             FROM api_keys
             WHERE key_hash = ? AND enabled = 1
             """,
@@ -159,6 +162,17 @@ def require_api_key(
             detail={
                 "error": {
                     "message": "Invalid or inactive API key",
+                    "type": "authentication_error",
+                }
+            },
+        )
+
+    if row["expires_at"] and row["expires_at"] > 0 and time.time() > row["expires_at"]:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": {
+                    "message": "API key has expired",
                     "type": "authentication_error",
                 }
             },

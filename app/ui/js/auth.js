@@ -47,6 +47,8 @@ function showMainDashboard(username) {
     if (adminUserBadge) adminUserBadge.innerText = username || 'Admin';
 
     startBackgroundSync();
+    if (typeof fetchApiKeys === 'function') fetchApiKeys();
+    if (typeof fetchAvailableModels === 'function') fetchAvailableModels();
     switchTab('telemetry');
 }
 

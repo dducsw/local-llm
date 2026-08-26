@@ -64,6 +64,13 @@ def prometheus_metrics():
 def dashboard():
     ui_file = APP_DIR / "ui" / "index.html"
     if ui_file.is_file():
-        return HTMLResponse(content=ui_file.read_text(encoding="utf-8"))
+        return HTMLResponse(
+            content=ui_file.read_text(encoding="utf-8"),
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return DASHBOARD_FALLBACK_HTML
 
