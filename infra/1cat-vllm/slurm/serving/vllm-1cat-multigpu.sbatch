@@ -99,8 +99,8 @@ elif [[ -d "$HOME/dev/models/$MODEL" ]]; then
 fi
 
 QUANT_ARGS=()
-if [[ "$MODEL" =~ [Aa][Ww][Qq] ]]; then
-  QUANT_ARGS=(--quantization awq)
+if [[ -n "${QUANTIZATION:-}" ]]; then
+  QUANT_ARGS=(--quantization "$QUANTIZATION")
 fi
 
 echo "Resolved model path in container: $MODEL_ARG"
