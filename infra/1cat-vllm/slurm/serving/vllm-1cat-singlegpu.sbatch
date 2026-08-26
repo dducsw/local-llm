@@ -116,8 +116,9 @@ fi
 
 echo "Resolved model path in container: $MODEL_ARG"
 
-# Run 1Cat-vLLM serving with FLASH_ATTN_V100 backend
+# Run 1Cat-vLLM serving with FLASH_ATTN_V100 backend (VLLM_USE_V1=0 for Volta SM70)
 "${NUMA_PREFIX[@]}" apptainer run --nv --cleanenv \
+  --env VLLM_USE_V1=0,NVIDIA_TF32_OVERRIDE=0,NCCL_P2P_DISABLE=1 \
   "${BIND_ARGS[@]}" \
   "$IMAGE" \
   serve "$MODEL_ARG" \
