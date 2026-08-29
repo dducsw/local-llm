@@ -11,6 +11,110 @@ let totalTokens = 0;
 let ledger = [];
 let activeFilter = 'all';
 
+// Preset System Instructions Dictionary
+const SYSTEM_PROMPT_PRESETS = {
+    general: "You are a helpful, concise, and technically accurate AI assistant running locally on your HPC cluster via AI Local Gateway.",
+    coder: "You are a senior AI software engineer and Python/CUDA specialist. Provide clean, well-structured, production-ready code with concise technical explanations and optimal time/space complexity.",
+    hpc: "You are an HPC Systems and Slurm Workload Manager specialist. Assist with writing robust sbatch scripts, Apptainer/Singularity container execution, multi-GPU parallelism, and Tesla V100 GPU tuning.",
+    vi: "Bạn là một trợ lý AI thông minh, hỗ trợ bằng tiếng Việt chuẩn xác, lưu loát và chuyên nghiệp cho các tác vụ kỹ thuật, lập trình và xử lý ngôn ngữ tự nhiên.",
+    latex: "You are an academic researcher and LaTeX formatting expert. Provide rigorous mathematical formulations, clean LaTeX equations, and structured research summaries."
+};
+
+function applySystemPromptPreset(presetKey) {
+    const promptInput = document.getElementById('chat-system-prompt');
+    if (promptInput && SYSTEM_PROMPT_PRESETS[presetKey]) {
+        promptInput.value = SYSTEM_PROMPT_PRESETS[presetKey];
+        updateContextWindowMeter();
+        showToast(`Loaded preset: ${presetKey.toUpperCase()}`, 'info');
+    }
+}
+
+function updateChatSettings() {
+    try {
+        const settings = {
+            temp: parseFloat(document.getElementById('chat-temp')?.value) || 0.7,
+            top_p: parseFloat(document.getElementById('chat-topp')?.value) || 0.9,
+            max_tokens: parseInt(document.getElementById('chat-tokens')?.value, 10) || 2048,
+            presence: parseFloat(document.getElementById('chat-presence')?.value) || 0.0,
+            frequency: parseFloat(document.getElementById('chat-frequency')?.value) || 0.0,
+        };
+        localStorage.setItem('hpc_chat_settings', JSON.stringify(settings));
+    } catch (e) {}
+}
+
+function loadChatSettings() {
+    try {
+        const saved = localStorage.getItem('hpc_chat_settings');
+        if (!saved) return;
+        const s = JSON.parse(saved);
+        const t = document.getElementById('chat-temp');
+        const tp = document.getElementById('chat-topp');
+        const tok = document.getElementById('chat-tokens');
+        const pr = document.getElementById('chat-presence');
+        const fr = document.getElementById('chat-frequency');
+
+        if (t && s.temp !== undefined) { t.value = s.temp; document.getElementById('chat-val-temp').innerText = parseFloat(s.temp).toFixed(2); }
+        if (tp && s.top_p !== undefined) { tp.value = s.top_p; document.getElementById('chat-val-topp').innerText = parseFloat(s.top_p).toFixed(2); }
+        if (tok && s.max_tokens !== undefined) { tok.value = s.max_tokens; document.getElementById('chat-val-tokens').innerText = s.max_tokens; }
+        if (pr && s.presence !== undefined) { pr.value = s.presence; document.getElementById('chat-val-presence').innerText = parseFloat(s.presence).toFixed(2); }
+        if (fr && s.frequency !== undefined) { fr.value = s.frequency; document.getElementById('chat-val-frequency').innerText = parseFloat(s.frequency).toFixed(2); }
+    } catch (e) {}
+}
+
+// Token Estimation Engine (Accurate Fast Approximation)
+function estimateTokenCount(text) {
+    if (!text) return 0;
+    const str = String(text);
+    // Count CJK & Vietnamese complex characters (often 1-2 tokens per char)
+    const nonAsciiCount = (str.match(/[^\x00-\x7F]/g) || []).length;
+    // Latin words & symbols (~4 chars per token)
+    const asciiChars = str.length - nonAsciiCount;
+    return Math.max(1, Math.ceil(asciiChars / 3.8 + nonAsciiCount * 1.2));
+}
+
+function updateContextWindowMeter() {
+    const maxContext = 32768; // Standard context limit for Qwen 3.5
+    const sysPrompt = document.getElementById('chat-system-prompt')?.value || '';
+    const userInput = document.getElementById('chat-user-input')?.value || '';
+
+    let totalChars = sysPrompt.length;
+    conversationHistory.forEach(m => totalChars += (m.content || '').length);
+    const historyTokens = estimateTokenCount(sysPrompt) + conversationHistory.reduce((acc, m) => acc + estimateTokenCount(m.content), 0);
+    const inputTokens = estimateTokenCount(userInput);
+    const totalEstTokens = historyTokens + (userInput ? inputTokens : 0);
+
+    const pct = Math.min(100, Math.max(0.1, (totalEstTokens / maxContext) * 100));
+    const pctStr = pct.toFixed(1) + '%';
+
+    const pctEl = document.getElementById('chat-context-pct');
+    const barEl = document.getElementById('chat-context-bar');
+    const usedEl = document.getElementById('chat-context-used');
+    const maxEl = document.getElementById('chat-context-max');
+    const headerTokens = document.getElementById('chat-header-tokens-counter');
+    const inputLiveTokens = document.getElementById('chat-input-live-tokens');
+
+    if (pctEl) pctEl.innerText = pctStr;
+    if (usedEl) usedEl.innerText = `${totalEstTokens.toLocaleString()} tokens`;
+    if (maxEl) maxEl.innerText = `${maxContext.toLocaleString()} max`;
+    if (headerTokens) headerTokens.innerText = `~${totalEstTokens.toLocaleString()} tok (${pctStr})`;
+    if (inputLiveTokens) inputLiveTokens.innerText = `Input: ~${inputTokens} tok • Total: ~${totalEstTokens} tok`;
+
+    if (barEl) {
+        barEl.style.width = `${pct}%`;
+        if (pct > 80) {
+            barEl.className = 'bg-gradient-to-r from-rose-500 to-rose-600 h-full rounded-full transition-all duration-300';
+        } else if (pct > 50) {
+            barEl.className = 'bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-300';
+        } else {
+            barEl.className = 'bg-gradient-to-r from-neon-500 to-emerald-400 h-full rounded-full transition-all duration-300';
+        }
+    }
+}
+
+function onChatInputChanged() {
+    updateContextWindowMeter();
+}
+
 async function fetchAvailableModels() {
     try {
         const res = await fetch(`${GATEWAY_BASE}/v1/models`, {
@@ -69,6 +173,7 @@ async function fetchAvailableModels() {
                     </div>
                 `).join('');
             }
+            updateContextWindowMeter();
         }
     } catch (err) {
         console.debug('Failed to fetch available models:', err);
@@ -345,10 +450,14 @@ async function sendChatMessage() {
 
     input.value = '';
     appendChatMessage('user', text);
+    updateContextWindowMeter();
 
     const sysPrompt = document.getElementById('chat-system-prompt')?.value.trim() || 'You are a helpful, direct, and concise AI assistant.';
     const temp = parseFloat(document.getElementById('chat-temp')?.value) || 0.7;
+    const topP = parseFloat(document.getElementById('chat-topp')?.value) || 0.9;
     const maxTokens = parseInt(document.getElementById('chat-tokens')?.value, 10) || 2048;
+    const presencePenalty = parseFloat(document.getElementById('chat-presence')?.value) || 0.0;
+    const frequencyPenalty = parseFloat(document.getElementById('chat-frequency')?.value) || 0.0;
 
     const sendBtn = document.getElementById('chat-send-btn');
     const stopBtn = document.getElementById('chat-stop-btn');
@@ -374,6 +483,7 @@ async function sendChatMessage() {
         if (isFinal) {
             streamDone = true;
             renderBubble();
+            updateContextWindowMeter();
             return;
         }
         if (renderScheduled) return;
@@ -417,6 +527,17 @@ async function sendChatMessage() {
 
     try {
         const authKey = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || activeApiKey || 'admin123';
+        const requestPayload = {
+            model: currentSelectedModel || document.getElementById('chat-model-select')?.value || 'qwen3.5-9b',
+            messages: messagesPayload,
+            temperature: temp,
+            top_p: topP,
+            max_tokens: maxTokens,
+            stream: true
+        };
+        if (presencePenalty !== 0.0) requestPayload.presence_penalty = presencePenalty;
+        if (frequencyPenalty !== 0.0) requestPayload.frequency_penalty = frequencyPenalty;
+
         const res = await fetch(`${GATEWAY_BASE}/v1/chat/completions`, {
             method: 'POST',
             signal: chatAbortController.signal,
@@ -425,13 +546,7 @@ async function sendChatMessage() {
                 'X-Admin-Session': authKey,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                model: currentSelectedModel || document.getElementById('chat-model-select')?.value || 'qwen3.5-9b',
-                messages: messagesPayload,
-                temperature: temp,
-                max_tokens: maxTokens,
-                stream: true
-            })
+            body: JSON.stringify(requestPayload)
         });
 
         if (!res.ok) {
@@ -462,15 +577,15 @@ async function sendChatMessage() {
                 fullContent = rawContent;
             }
 
+            conversationHistory.push({ role: 'assistant', content: fullContent || fullReasoning });
             scheduleRender(true);
+            updateContextWindowMeter();
 
             const elapsed = (performance.now() - startTime) / 1000;
             const completionTokens = data.usage?.completion_tokens || 10;
             const speed = (completionTokens / (elapsed || 1)).toFixed(1);
             const liveSpeed = document.getElementById('chat-live-speed');
             if (liveSpeed) liveSpeed.innerText = speed;
-
-            conversationHistory.push({ role: 'assistant', content: fullContent || fullReasoning });
             return;
         }
 
@@ -535,8 +650,9 @@ async function sendChatMessage() {
             }
         }
 
-        scheduleRender(true);
         conversationHistory.push({ role: 'assistant', content: fullContent || fullReasoning });
+        scheduleRender(true);
+        updateContextWindowMeter();
 
     } catch (err) {
         if (err.name === 'AbortError') {
@@ -592,6 +708,7 @@ function stopChatStreaming() {
 
 function clearChatHistory() {
     conversationHistory = [];
+    updateContextWindowMeter();
     const modelName = currentSelectedModel || document.getElementById('chat-model-select')?.value || 'AI Assistant';
     const container = document.getElementById('chat-messages-container');
     if (container) {
@@ -710,4 +827,15 @@ function escapeHtml(text) {
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
+}
+
+// Auto-initialize Chatbot Settings and Context Window Meter
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        loadChatSettings();
+        updateContextWindowMeter();
+    });
+} else {
+    loadChatSettings();
+    updateContextWindowMeter();
 }

@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.config import MODELS, RECENT_LOGS
 from app.database import db
+from app.services.metrics_service import get_live_gpu_telemetry
 
 router = APIRouter(tags=["Telemetry & Metrics"])
 
@@ -31,6 +32,8 @@ async def get_realtime_metrics():
     recent_tok_s = round(sum(log["tok_per_sec"] for log in recent_5m) / len(recent_5m), 1) if recent_5m else 0.0
     last_ttft = round(recent_5m[0]["ttft_ms"], 1) if recent_5m and recent_5m[0]["ttft_ms"] else 0.0
 
+    gpu_telemetry = await get_live_gpu_telemetry()
+
     return {
         "model": list(MODELS.keys())[0] if MODELS else "qwen3.5-9b",
         "total_requests": row["total_requests"] if row else len(RECENT_LOGS),
@@ -40,10 +43,18 @@ async def get_realtime_metrics():
         "current_tok_per_sec": recent_tok_s or (round(row["avg_tok_per_sec"], 1) if row else 0.0),
         "last_ttft_ms": last_ttft or (round(row["avg_ttft_ms"], 1) if row else 0.0),
         "avg_latency_ms": round(row["avg_latency_ms"], 1) if row else 0.0,
-        "vram_used_gb": 5.8,
-        "vram_total_gb": 16.0,
-        "gpu_name": "NVIDIA Tesla V100-SXM2-16GB",
-        "kv_cache_free_pct": 64.2,
+        "vram_used_gb": gpu_telemetry.get("vram_used_gb", 0.0),
+        "vram_total_gb": gpu_telemetry.get("vram_total_gb", 16.0),
+        "vram_used_pct": gpu_telemetry.get("vram_used_pct", 0.0),
+        "gpu_name": gpu_telemetry.get("device_name", "NVIDIA Tesla V100-SXM2-16GB"),
+        "gpu_utilization_pct": gpu_telemetry.get("gpu_utilization_pct", 0),
+        "gpu_temperature_c": gpu_telemetry.get("gpu_temperature_c"),
+        "gpu_power_w": gpu_telemetry.get("gpu_power_w"),
+        "kv_cache_free_pct": gpu_telemetry.get("kv_cache_free_pct", 100.0),
+        "kv_cache_used_pct": gpu_telemetry.get("kv_cache_used_pct", 0.0),
+        "vllm_running_reqs": gpu_telemetry.get("vllm_running_reqs", 0),
+        "vllm_waiting_reqs": gpu_telemetry.get("vllm_waiting_reqs", 0),
+        "status": gpu_telemetry.get("status", "STANDBY"),
     }
 
 
@@ -156,15 +167,4 @@ async def get_metrics_logs(limit: int = 50):
 @router.get("/api/gpu/telemetry")
 async def get_gpu_telemetry():
     """Return GPU hardware telemetry."""
-    return {
-        "device_name": "NVIDIA Tesla V100-SXM2-16GB",
-        "architecture": "Volta (SM70)",
-        "vram_total_mb": 16384,
-        "vram_used_mb": 5940,
-        "vram_free_mb": 10444,
-        "gpu_utilization_pct": 24,
-        "driver_version": "535.183.01",
-        "cuda_version": "12.2",
-        "model_loaded": "Qwen3.5-9B-Q4_K_M.gguf (FP16)",
-        "tp_size": 1,
-    }
+    return await get_live_gpu_telemetry()

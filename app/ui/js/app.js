@@ -238,6 +238,11 @@ function switchTab(tabName) {
 
     if (window.lucide) lucide.createIcons();
 
+    // Clean up live stream if leaving slurm tab
+    if (activeName !== 'slurm' && typeof stopLiveLogStream === 'function') {
+        stopLiveLogStream(false);
+    }
+
     // Trigger tab-specific refresh routines (Manual on click)
     if (activeName === 'telemetry') {
         if (typeof fetchRealtimeMetrics === 'function') fetchRealtimeMetrics();
@@ -250,6 +255,8 @@ function switchTab(tabName) {
         if (typeof fetchTunnelTelemetry === 'function') fetchTunnelTelemetry();
     } else if (activeName === 'chatbot') {
         if (typeof fetchAvailableModels === 'function') fetchAvailableModels();
+        if (typeof loadChatSettings === 'function') loadChatSettings();
+        if (typeof updateContextWindowMeter === 'function') updateContextWindowMeter();
     } else if (activeName === 'keys') {
         if (typeof fetchApiKeys === 'function') fetchApiKeys();
         if (typeof fetchAvailableModels === 'function') fetchAvailableModels();

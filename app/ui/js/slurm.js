@@ -318,14 +318,110 @@ async function cancelSlurmJob(jobId) {
 }
 
 let selectedSlurmJobId = null;
+let liveLogEventSource = null;
 
 async function inspectSlurmJobLog(jobId) {
     selectedSlurmJobId = jobId;
     const logTitle = document.getElementById('slurm-log-title');
     const logContent = document.getElementById('slurm-log-terminal');
     if (logTitle) logTitle.innerText = `Live Slurm Job Logs - Job #${jobId}`;
-    if (logContent) logContent.innerText = 'Fetching stdout / stderr from HPC cluster...';
-    await refreshSlurmLogs();
+    if (logContent) logContent.innerText = `[SSE Stream] Connecting to job #${jobId}...`;
+
+    // Automatically initiate live streaming on select
+    startLiveLogStream(jobId);
+}
+
+function startLiveLogStream(jobId) {
+    const id = jobId || selectedSlurmJobId;
+    if (!id) {
+        showToast('Please select an active Slurm job first', 'warning');
+        return;
+    }
+    selectedSlurmJobId = id;
+    stopLiveLogStream(false);
+
+    const logContent = document.getElementById('slurm-log-terminal');
+    const badge = document.getElementById('slurm-log-stream-badge');
+    const dot = document.getElementById('slurm-log-live-dot');
+    const btnText = document.getElementById('btn-stream-logs-text');
+    const btn = document.getElementById('btn-toggle-stream-logs');
+
+    if (badge) {
+        badge.innerText = '● LIVE (SSE)';
+        badge.className = 'px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-bold border border-emerald-200 dark:border-emerald-800/40 shadow-sm animate-pulse';
+    }
+    if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-neon-pulse';
+    if (btnText) btnText.innerText = 'Pause Stream';
+    if (btn) btn.className = 'px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase flex items-center gap-1.5 transition-all shadow-sm';
+
+    try {
+        liveLogEventSource = new EventSource(`${GATEWAY_BASE}/api/slurm/logs/${id}/stream`);
+
+        liveLogEventSource.onmessage = function (event) {
+            if (!event.data) return;
+            try {
+                const data = JSON.parse(event.data);
+                if (data.log || data.stderr) {
+                    const text = data.log || (data.stderr ? `[stderr]\n${data.stderr}` : '');
+                    if (logContent) {
+                        logContent.innerText = text || '(no output received yet)';
+                        const autoscroll = document.getElementById('slurm-log-autoscroll');
+                        if (autoscroll && autoscroll.checked) {
+                            logContent.scrollTop = logContent.scrollHeight;
+                        }
+                    }
+                }
+            } catch (e) {}
+        };
+
+        liveLogEventSource.onerror = function () {
+            if (badge) {
+                badge.innerText = 'RECONNECTING';
+                badge.className = 'px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold border border-amber-200';
+            }
+        };
+    } catch (err) {
+        showToast('Failed to connect SSE stream', 'error');
+        stopLiveLogStream(true);
+    }
+}
+
+function stopLiveLogStream(showNotice = true) {
+    if (liveLogEventSource) {
+        liveLogEventSource.close();
+        liveLogEventSource = null;
+    }
+
+    const badge = document.getElementById('slurm-log-stream-badge');
+    const dot = document.getElementById('slurm-log-live-dot');
+    const btnText = document.getElementById('btn-stream-logs-text');
+    const btn = document.getElementById('btn-toggle-stream-logs');
+
+    if (badge) {
+        badge.innerText = 'PAUSED';
+        badge.className = 'px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700';
+    }
+    if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-400';
+    if (btnText) btnText.innerText = 'Start Live Stream';
+    if (btn) btn.className = 'px-3 py-1.5 rounded-lg bg-neon-500 text-slate-950 hover:bg-neon-400 font-black text-xs uppercase flex items-center gap-1.5 transition-all shadow-sm';
+
+    if (showNotice) showToast('Live stream paused', 'info');
+}
+
+function toggleLiveLogStream() {
+    if (liveLogEventSource) {
+        stopLiveLogStream(true);
+    } else {
+        startLiveLogStream();
+    }
+}
+
+function clearSlurmLogTerminal() {
+    const logContent = document.getElementById('slurm-log-terminal');
+    if (logContent) {
+        logContent.innerText = '[Log Cleared] Waiting for new data...';
+    }
+    showToast('Log viewer cleared', 'info');
 }
 
 async function refreshSlurmLogs() {
@@ -349,12 +445,14 @@ async function refreshSlurmLogs() {
         const stderr = data.stderr || '';
         logContent.innerText = `[stdout]\n${stdout || '(empty)'}\n\n[stderr]\n${stderr || '(empty)'}`;
         logContent.scrollTop = logContent.scrollHeight;
+        showToast('Logs refreshed', 'info');
     } catch (err) {
         logContent.innerText = 'Failed to load log file from server.';
     }
 }
 
 function closeJobLogModal() {
+    stopLiveLogStream(false);
     const modal = document.getElementById('modal-job-logs');
     if (modal) modal.classList.add('hidden');
 }

@@ -48,14 +48,22 @@ if not ADMIN_PASSWORD:
     print(f"\n{'='*50}\nSECURITY WARNING: No ADMIN_PASSWORD set in .env!\nGenerated random admin password: {ADMIN_PASSWORD}\n{'='*50}\n")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", ADMIN_PASSWORD)
 UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT", "3600"))
+MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "16"))
+MAX_CONCURRENT_PER_KEY = int(os.getenv("MAX_CONCURRENT_PER_KEY", "4"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 # HPC SSH / Slurm Supervision Configurations
 HPC_SSH_HOST = os.getenv("HPC_SSH_HOST", "")
 HPC_SSH_USER = os.getenv("HPC_SSH_USER", "")
 HPC_SSH_KEY = os.getenv("HPC_SSH_KEY", "")
-if not HPC_SSH_KEY and os.path.exists("/run/secrets/hpc_ssh_key"):
-    HPC_SSH_KEY = "/run/secrets/hpc_ssh_key"
+if not HPC_SSH_KEY or not os.path.exists(os.path.expanduser(HPC_SSH_KEY)):
+    host_key = os.getenv("HPC_HOST_SSH_KEY", "")
+    if host_key and os.path.exists(os.path.expanduser(host_key)):
+        HPC_SSH_KEY = host_key
+    elif os.path.exists("/root/.ssh/id_ed25519"):
+        HPC_SSH_KEY = "/root/.ssh/id_ed25519"
+    elif os.path.exists(os.path.expanduser("~/.ssh/id_ed25519")):
+        HPC_SSH_KEY = os.path.expanduser("~/.ssh/id_ed25519")
 HPC_REMOTE_DIR = os.getenv("HPC_REMOTE_DIR", "~/local-llm/infra")
 HPC_LOG_DIR = os.getenv("HPC_LOG_DIR", f"{HPC_REMOTE_DIR}/logs")
 HPC_SLURM_ACCOUNT = os.getenv("HPC_SLURM_ACCOUNT", "summer-school")

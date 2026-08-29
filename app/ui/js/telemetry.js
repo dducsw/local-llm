@@ -137,14 +137,29 @@ async function fetchRealtimeMetrics() {
         }
         if (modelProvider) modelProvider.innerText = 'vLLM • QOS gpu-q';
 
-        // 2. VRAM & Node Allocation Card
+        // 2. GPU VRAM & Hardware HUD Card
         const vramUsage = document.getElementById('metric-vram-usage');
-        const vramSub = document.getElementById('metric-vram-sub');
-        const nodeStatus = document.getElementById('metric-node-status');
+        const vramTotal = document.getElementById('metric-vram-total');
+        const vramPct = document.getElementById('metric-vram-pct');
+        const vramBar = document.getElementById('metric-vram-bar');
+        const tempBadge = document.getElementById('metric-gpu-temp-badge');
+        const gpuUtil = document.getElementById('metric-gpu-util');
+        const gpuPower = document.getElementById('metric-gpu-power');
 
-        if (vramUsage) vramUsage.innerText = `${data.nodes_count || 4}`;
-        if (vramSub) vramSub.innerText = 'nodes in cluster';
-        if (nodeStatus) nodeStatus.innerText = 'ONLINE (OPERATIONAL)';
+        const usedGb = (data.vram_used_gb !== undefined && data.vram_used_gb !== null) ? data.vram_used_gb : 0.0;
+        const totalGb = (data.vram_total_gb !== undefined && data.vram_total_gb !== null) ? data.vram_total_gb : 32.0;
+        const pct = (data.vram_used_pct !== undefined && data.vram_used_pct !== null) ? data.vram_used_pct : Math.round((usedGb / (totalGb || 1)) * 100);
+
+        if (vramUsage) vramUsage.innerText = (typeof usedGb === 'number') ? usedGb.toFixed(1) : usedGb;
+        if (vramTotal) vramTotal.innerText = (typeof totalGb === 'number') ? totalGb.toFixed(1) : totalGb;
+        if (vramPct) vramPct.innerText = `${pct}%`;
+        if (vramBar) vramBar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+
+        if (tempBadge) {
+            tempBadge.innerText = data.gpu_temperature_c ? `${data.gpu_temperature_c}°C` : (data.status || 'ONLINE');
+        }
+        if (gpuUtil) gpuUtil.innerText = `${data.gpu_utilization_pct !== undefined ? data.gpu_utilization_pct : 0}`;
+        if (gpuPower) gpuPower.innerText = (data.gpu_power_w !== null && data.gpu_power_w !== undefined) ? `${Math.round(data.gpu_power_w)}` : '--';
 
         // 3. Generation Speed & TTFT Card
         const kpiSpeed = document.getElementById('metric-speed');

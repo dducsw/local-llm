@@ -50,9 +50,10 @@ def run_slurm_cli(
     # 2. Remote SSH execution if HPC_SSH_HOST configured (VM -> HPC)
     if HPC_SSH_HOST and HPC_SSH_HOST != "your-host":
         try:
-            cmd_str = " ".join(f"'{arg}'" if (" " in arg or "%" in arg) else arg for arg in cmd_args)
+            import shlex
+            cmd_str = " ".join(shlex.quote(arg) for arg in cmd_args)
             if work_dir:
-                remote_cmd_str = f"cd {work_dir} && {cmd_str}"
+                remote_cmd_str = f"cd {shlex.quote(work_dir)} && {cmd_str}"
             else:
                 remote_cmd_str = cmd_str
             ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]

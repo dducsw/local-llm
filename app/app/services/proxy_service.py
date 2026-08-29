@@ -1,3 +1,5 @@
+import asyncio
+from collections import defaultdict
 import json
 import secrets
 import time
@@ -5,12 +7,93 @@ import httpx
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from app.config import MODELS, UPSTREAM_TIMEOUT, load_models, log
+from app.config import (
+    MAX_CONCURRENT_PER_KEY,
+    MAX_CONCURRENT_REQUESTS,
+    MODELS,
+    UPSTREAM_TIMEOUT,
+    load_models,
+    log,
+)
 from app.database import record_telemetry
 from app.schemas import Identity
 from app.services.auth_service import allowed, enforce_rpm
 
 _CLIENT: httpx.AsyncClient | None = None
+_GLOBAL_SEMAPHORE = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+_KEY_SEMAPHORES: dict[int, asyncio.Semaphore] = defaultdict(lambda: asyncio.Semaphore(MAX_CONCURRENT_PER_KEY))
+_ACTIVE_KEY_REQUESTS: dict[int, int] = defaultdict(int)
+
+
+class ConcurrencyGuard:
+    """Async context manager to safely acquire and release global & per-key concurrency slots."""
+
+    def __init__(self, identity: Identity):
+        self.identity = identity
+        self.acquired = False
+
+    async def __aenter__(self):
+        # Non-blocking acquisition check
+        if _GLOBAL_SEMAPHORE.locked():
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": {
+                        "message": f"Gateway capacity reached ({MAX_CONCURRENT_REQUESTS} max concurrent requests). Please retry in a few seconds.",
+                        "type": "concurrency_limit_error",
+                    }
+                },
+                headers={"Retry-After": "2"},
+            )
+
+        key_sem = _KEY_SEMAPHORES[self.identity.id]
+        if key_sem.locked():
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": {
+                        "message": f"API key concurrency limit reached ({MAX_CONCURRENT_PER_KEY} max concurrent requests for key {self.identity.prefix}). Please wait for active queries to complete.",
+                        "type": "concurrency_limit_error",
+                    }
+                },
+                headers={"Retry-After": "2"},
+            )
+
+        try:
+            await asyncio.wait_for(_GLOBAL_SEMAPHORE.acquire(), timeout=0.1)
+            await asyncio.wait_for(key_sem.acquire(), timeout=0.1)
+            _ACTIVE_KEY_REQUESTS[self.identity.id] += 1
+            self.acquired = True
+            return self
+        except asyncio.TimeoutError:
+            if self.acquired:
+                _GLOBAL_SEMAPHORE.release()
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": {
+                        "message": "Concurrency limit saturated under heavy load. Please retry in a moment.",
+                        "type": "concurrency_limit_error",
+                    }
+                },
+                headers={"Retry-After": "2"},
+            )
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self.release()
+
+    def release(self):
+        if self.acquired:
+            self.acquired = False
+            _ACTIVE_KEY_REQUESTS[self.identity.id] = max(0, _ACTIVE_KEY_REQUESTS[self.identity.id] - 1)
+            try:
+                _KEY_SEMAPHORES[self.identity.id].release()
+            except Exception:
+                pass
+            try:
+                _GLOBAL_SEMAPHORE.release()
+            except Exception:
+                pass
 
 
 def get_upstream_client() -> httpx.AsyncClient:
@@ -100,78 +183,80 @@ async def proxy_openai(
     )
 
     client = get_upstream_client()
-    LLM_ACTIVE_REQUESTS.labels(model=public_model).inc()
+    guard = ConcurrencyGuard(identity)
+    await guard.__aenter__()
 
     if not stream:
         try:
-            resp = await client.post(
-                upstream_url,
-                json=upstream_payload,
-                headers=headers,
-            )
-        except httpx.HTTPError as exc:
-            LLM_ACTIVE_REQUESTS.labels(model=public_model).dec()
-            LLM_UPSTREAM_ERRORS_TOTAL.labels(model=public_model, error_type=type(exc).__name__).inc()
-            LLM_REQUESTS_TOTAL.labels(model=public_model, status="502", key_prefix=identity.prefix, stream="False").inc()
+            try:
+                resp = await client.post(
+                    upstream_url,
+                    json=upstream_payload,
+                    headers=headers,
+                )
+            except httpx.HTTPError as exc:
+                LLM_UPSTREAM_ERRORS_TOTAL.labels(model=public_model, error_type=type(exc).__name__).inc()
+                LLM_REQUESTS_TOTAL.labels(model=public_model, status="502", key_prefix=identity.prefix, stream="False").inc()
+                elapsed = (time.perf_counter() - started) * 1000
+                record_telemetry(rid, public_model, 0, 0, 0, elapsed, None, 0.0, "502 Upstream Error", identity.prefix)
+                return JSONResponse(
+                    status_code=502,
+                    headers={"X-Request-ID": rid},
+                    content={
+                        "error": {
+                            "message": f"Upstream unavailable: {type(exc).__name__}",
+                            "type": "upstream_error",
+                        }
+                    },
+                )
+
             elapsed = (time.perf_counter() - started) * 1000
-            record_telemetry(rid, public_model, 0, 0, 0, elapsed, None, 0.0, "502 Upstream Error", identity.prefix)
-            return JSONResponse(
-                status_code=502,
-                headers={"X-Request-ID": rid},
-                content={
+            elapsed_s = elapsed / 1000.0
+            LLM_LATENCY_SECONDS.labels(model=public_model, stream="False").observe(elapsed_s)
+            LLM_REQUESTS_TOTAL.labels(model=public_model, status=str(resp.status_code), key_prefix=identity.prefix, stream="False").inc()
+
+            log.info(
+                "end request_id=%s key=%s model=%s status=%s latency_ms=%.1f",
+                rid, identity.prefix, public_model, resp.status_code, elapsed,
+            )
+
+            try:
+                body = resp.json()
+            except Exception:
+                body = {
                     "error": {
-                        "message": f"Upstream unavailable: {type(exc).__name__}",
+                        "message": resp.text,
                         "type": "upstream_error",
                     }
-                },
-            )
-
-        LLM_ACTIVE_REQUESTS.labels(model=public_model).dec()
-        elapsed = (time.perf_counter() - started) * 1000
-        elapsed_s = elapsed / 1000.0
-        LLM_LATENCY_SECONDS.labels(model=public_model, stream="False").observe(elapsed_s)
-        LLM_REQUESTS_TOTAL.labels(model=public_model, status=str(resp.status_code), key_prefix=identity.prefix, stream="False").inc()
-
-        log.info(
-            "end request_id=%s key=%s model=%s status=%s latency_ms=%.1f",
-            rid, identity.prefix, public_model, resp.status_code, elapsed,
-        )
-
-        try:
-            body = resp.json()
-        except Exception:
-            body = {
-                "error": {
-                    "message": resp.text,
-                    "type": "upstream_error",
                 }
-            }
 
-        if isinstance(body, dict) and body.get("model"):
-            body["model"] = public_model
+            if isinstance(body, dict) and body.get("model"):
+                body["model"] = public_model
 
-        # Extract token usage and record telemetry
-        usage = body.get("usage", {}) if isinstance(body, dict) else {}
-        messages = upstream_payload.get("messages", [])
-        p_text = json.dumps(messages) if messages else upstream_payload.get("prompt", "")
-        fallback_p = max(1, len(str(p_text)) // 4)
-        p_tok = int(usage.get("prompt_tokens", fallback_p))
-        c_tok = int(usage.get("completion_tokens", len(json.dumps(body)) // 4))
-        t_tok = p_tok + c_tok
-        tok_s = round(c_tok / (elapsed / 1000.0), 1) if elapsed > 0 else 0.0
+            # Extract token usage and record telemetry
+            usage = body.get("usage", {}) if isinstance(body, dict) else {}
+            messages = upstream_payload.get("messages", [])
+            p_text = json.dumps(messages) if messages else upstream_payload.get("prompt", "")
+            fallback_p = max(1, len(str(p_text)) // 4)
+            p_tok = int(usage.get("prompt_tokens", fallback_p))
+            c_tok = int(usage.get("completion_tokens", len(json.dumps(body)) // 4))
+            t_tok = p_tok + c_tok
+            tok_s = round(c_tok / (elapsed / 1000.0), 1) if elapsed > 0 else 0.0
 
-        LLM_TOKENS_TOTAL.labels(model=public_model, type="prompt", key_prefix=identity.prefix).inc(p_tok)
-        LLM_TOKENS_TOTAL.labels(model=public_model, type="completion", key_prefix=identity.prefix).inc(c_tok)
-        if tok_s > 0:
-            LLM_TOKENS_PER_SEC.labels(model=public_model).observe(tok_s)
+            LLM_TOKENS_TOTAL.labels(model=public_model, type="prompt", key_prefix=identity.prefix).inc(p_tok)
+            LLM_TOKENS_TOTAL.labels(model=public_model, type="completion", key_prefix=identity.prefix).inc(c_tok)
+            if tok_s > 0:
+                LLM_TOKENS_PER_SEC.labels(model=public_model).observe(tok_s)
 
-        record_telemetry(rid, public_model, p_tok, c_tok, t_tok, elapsed, None, tok_s, f"{resp.status_code} OK", identity.prefix)
+            record_telemetry(rid, public_model, p_tok, c_tok, t_tok, elapsed, None, tok_s, f"{resp.status_code} OK", identity.prefix)
 
-        return JSONResponse(
-            status_code=resp.status_code,
-            headers={"X-Request-ID": rid},
-            content=body,
-        )
+            return JSONResponse(
+                status_code=resp.status_code,
+                headers={"X-Request-ID": rid},
+                content=body,
+            )
+        finally:
+            guard.release()
 
     # Streaming mode
     upstream_request = client.build_request(
@@ -180,7 +265,7 @@ async def proxy_openai(
     try:
         resp = await client.send(upstream_request, stream=True)
     except httpx.HTTPError as exc:
-        LLM_ACTIVE_REQUESTS.labels(model=public_model).dec()
+        guard.release()
         LLM_UPSTREAM_ERRORS_TOTAL.labels(model=public_model, error_type=type(exc).__name__).inc()
         LLM_REQUESTS_TOTAL.labels(model=public_model, status="502", key_prefix=identity.prefix, stream="True").inc()
         elapsed = (time.perf_counter() - started) * 1000
@@ -197,7 +282,7 @@ async def proxy_openai(
         )
 
     if resp.status_code >= 400:
-        LLM_ACTIVE_REQUESTS.labels(model=public_model).dec()
+        guard.release()
         content = await resp.aread()
         await resp.aclose()
         elapsed = (time.perf_counter() - started) * 1000
@@ -264,8 +349,8 @@ async def proxy_openai(
 
                     yield chunk
         finally:
+            guard.release()
             await resp.aclose()
-            LLM_ACTIVE_REQUESTS.labels(model=public_model).dec()
             total_elapsed = (time.perf_counter() - started) * 1000
             total_elapsed_s = total_elapsed / 1000.0
             LLM_LATENCY_SECONDS.labels(model=public_model, stream="True").observe(total_elapsed_s)

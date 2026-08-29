@@ -1,7 +1,9 @@
 import asyncio
+import json
 import time
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from app.config import (
     ACTIVE_SLURM_JOBS,
@@ -310,3 +312,55 @@ async def get_slurm_job_log(job_id: str):
         "job_id": job_id,
         "log": f"No active log file found for Slurm Job ID {job_id} in {HPC_REMOTE_DIR}/logs/.",
     }
+
+
+@router.get("/logs/{job_id}/stream")
+async def stream_slurm_job_log(job_id: str, request: Request):
+    """Stream live Slurm job output (stdout / stderr) in real-time via Server-Sent Events (SSE)."""
+    if not job_id.isdigit():
+        raise HTTPException(status_code=400, detail="Invalid Slurm job ID")
+
+    async def event_generator():
+        last_content = ""
+        iteration = 0
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+
+                # Query latest logs via get_slurm_job_log logic
+                log_data = await get_slurm_job_log(job_id)
+                current_text = log_data.get("stdout") or log_data.get("log") or ""
+                stderr_text = log_data.get("stderr") or ""
+                if stderr_text and not current_text:
+                    current_text = f"[stderr]\n{stderr_text}"
+
+                # If new text appended, send delta or full update
+                if current_text != last_content or iteration == 0:
+                    payload = {
+                        "job_id": job_id,
+                        "log": current_text,
+                        "stderr": stderr_text,
+                        "timestamp": time.time(),
+                        "status": "STREAMING",
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+                    last_content = current_text
+                else:
+                    # Heartbeat
+                    yield f": heartbeat {time.time()}\n\n"
+
+                iteration += 1
+                await asyncio.sleep(1.2)
+        except asyncio.CancelledError:
+            pass
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
