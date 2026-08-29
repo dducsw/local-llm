@@ -6,16 +6,29 @@
 
 set -euo pipefail
 
+# ==============================================================================
+# WARNING: This script downloads a hardcoded list of files via wget/curl.
+# It is a quick fallback for environments with no Python/HF Hub available.
+#
+# PREFERRED: Use the Slurm batch job for a complete, resumable download:
+#   sbatch slurm/download/hf_download_qwen3.5_9b_awq.sbatch
+#
+# This script may MISS files if the model has multiple safetensors shards
+# (e.g., model-00001-of-00002.safetensors). Verify with:
+#   ls -lh "$DEST_ROOT/Qwen3.5-9B-AWQ/"
+# ==============================================================================
+
+
 DEST_ROOT="${1:-$HOME/dev/models}"
-MODEL_DIR="$DEST_ROOT/Qwen3.5-9B-AWQ-INT4"
-BASE_URL="https://huggingface.co/drawais/Qwen3.5-9B-AWQ-INT4/resolve/main"
+MODEL_DIR="$DEST_ROOT/Qwen3.5-9B-AWQ"
+BASE_URL="https://huggingface.co/QuantTrio/Qwen3.5-9B-AWQ/resolve/main"
 
 mkdir -p "$MODEL_DIR"
 cd "$MODEL_DIR"
 
 echo "=========================================================="
 echo " 1Cat-vLLM AWQ Model Downloader"
-echo " Model Repository : drawais/Qwen3.5-9B-AWQ-INT4"
+echo " Model Repository : QuantTrio/Qwen3.5-9B-AWQ"
 echo " Destination Dir  : $MODEL_DIR"
 echo "=========================================================="
 

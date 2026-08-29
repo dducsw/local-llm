@@ -10,6 +10,17 @@
 
 set -euo pipefail
 
+# 1Cat-vLLM wheels are built for Python 3.12 (cp312) only.
+# Fail fast here rather than with a cryptic pip error later.
+PYVER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
+if [[ "$PYVER" != "3.12" ]]; then
+    echo "ERROR: Python 3.12 required (found $PYVER)."
+    echo "Create a conda env with: conda create -y -n $ENV_NAME python=3.12"
+    echo "Then re-source this script inside that environment."
+    exit 1
+fi
+
+
 ENV_NAME="${ENV_NAME:-1cat-vllm-sm70}"
 CONDA_DIR="${CONDA_DIR:-$HOME/miniconda3}"
 CUDA_HOME="${CUDA_HOME:-/usr/local/cuda-12.8}"
@@ -94,20 +105,17 @@ if [ -n "$WHEEL_URLS" ]; then
         --extra-index-url https://download.pytorch.org/whl/cu128 \
         "$WHEEL_DIR"/*.whl
 else
-    echo "[!] Could not automatically fetch latest release wheel URLs via GitHub API."
-    echo "[*] Attempting to install from local ./wheels directory..."
+    echo "[!] GitHub API returned no wheel URLs (rate limit or network issue)."
+    echo "    Manually download cp312 wheels from:"
+    echo "      https://github.com/1CatAI/1Cat-vLLM/releases/latest"
+    echo "    Place .whl files in: $PWD/$WHEEL_DIR"
     if ls "$WHEEL_DIR"/*.whl 1> /dev/null 2>&1; then
+        echo "[*] Found existing wheels in $WHEEL_DIR — installing those..."
         python -m pip install --prefer-binary --no-cache-dir \
             --extra-index-url https://download.pytorch.org/whl/cu128 \
             "$WHEEL_DIR"/*.whl
     else
-        echo "[*] Installing auxiliary utilities..."
-        python -m pip install --no-cache-dir huggingface-hub hf-transfer openai
-        echo "=========================================================="
-        echo "Please manually download the .whl files from:"
-        echo "  https://github.com/1CatAI/1Cat-vLLM/releases/latest"
-        echo "Place them in $PWD/$WHEEL_DIR and rerun this script."
-        echo "=========================================================="
+        echo "[✗] No wheels found. Cannot continue."
         exit 1
     fi
 fi

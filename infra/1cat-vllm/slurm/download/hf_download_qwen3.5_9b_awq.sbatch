@@ -18,7 +18,7 @@ mkdir -p logs
 
 CACHE_ROOT=${CACHE_ROOT:-${SCRATCH:-$HOME/.cache}/llm-serving}
 DEST_DIR="${MODELS_DIR:-$HOME/dev/models}"
-MODEL_REPO="${MODEL_REPO:-drawais/Qwen3.5-9B-AWQ-INT4}"
+MODEL_REPO="${MODEL_REPO:-QuantTrio/Qwen3.5-9B-AWQ}"
 MODEL_SUBDIR="$DEST_DIR/$(basename "$MODEL_REPO")"
 
 mkdir -p "$DEST_DIR"

@@ -30,7 +30,7 @@ else
 fi
 
 IMAGE=${IMAGE:-$DEFAULT_IMAGE}
-MODEL=${MODEL:-Qwen3.5-9B-AWQ-INT4}
+MODEL=${MODEL:-Qwen3.5-9B-AWQ}
 MODELS_DIR=${MODELS_DIR:-$HOME/dev/models}
 CACHE_ROOT=${CACHE_ROOT:-${SCRATCH:-$HOME/.cache}/llm-serving}
 PORT=${PORT:-8000}
@@ -109,12 +109,19 @@ elif [[ -d "$HOME/dev/models/$MODEL" ]]; then
   MODEL_ARG="/models/$MODEL"
 fi
 
+# Auto-detect AWQ from model name; override with $QUANTIZATION env if set explicitly
 QUANT_ARGS=()
 if [[ -n "${QUANTIZATION:-}" ]]; then
   QUANT_ARGS=(--quantization "$QUANTIZATION")
+elif [[ "$MODEL" =~ [Aa][Ww][Qq] ]]; then
+  QUANT_ARGS=(--quantization awq)
+  echo "[auto] Detected AWQ model — adding --quantization awq"
 fi
 
 echo "Resolved model path in container: $MODEL_ARG"
+
+# JSON string for --limit-mm-per-prompt (must be a single shell word)
+LIMIT_MM='{"image":0,"video":0}'
 
 # Run 1Cat-vLLM serving with FLASH_ATTN_V100 backend (VLLM_USE_V1=0 for Volta SM70)
 "${NUMA_PREFIX[@]}" apptainer run --nv --cleanenv \
@@ -134,7 +141,8 @@ echo "Resolved model path in container: $MODEL_ARG"
   --trust-remote-code \
   --enable-prefix-caching \
   --enable-chunked-prefill \
-  --limit-mm-per-prompt '{"image": 0, "video": 0}' \
+  --reasoning-parser qwen3 \
+  --limit-mm-per-prompt "$LIMIT_MM" \
   "${QUANT_ARGS[@]}" &
 
 VLLM_PID=$!

@@ -74,8 +74,17 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
             /tmp/wheels/*.whl
         rm -rf /tmp/wheels
     else
-        echo "Warning: Could not automatically fetch 1Cat-vLLM wheels via GitHub API. Please install wheels manually."
+        echo "ERROR: Could not fetch 1Cat-vLLM wheels via GitHub API (rate limit or network issue)."
+        echo "Download wheels manually from https://github.com/1CatAI/1Cat-vLLM/releases/latest"
+        echo "and place them in /tmp/wheels/, then rebuild."
+        exit 1
     fi
+
+    # Verify 1cat-vllm installed successfully — fail build loudly if not
+    python3 -c "import vllm; print('1Cat-vLLM version:', vllm.__version__)" || {
+        echo "ERROR: 1Cat-vLLM failed to import after install. Container build aborted."
+        exit 1
+    }
 
 %test
     export PATH=/opt/venv/bin:$PATH
@@ -99,7 +108,7 @@ PY
       apptainer run --nv \
         --bind /path/to/cache:/cache \
         --bind /path/to/models:/models:ro \
-        1cat-vllm.sif serve /models/Qwen3.5-9B-AWQ-INT4 \
+        1cat-vllm.sif serve /models/Qwen3.5-9B-AWQ \
         --dtype float16 \
         --attention-backend FLASH_ATTN_V100 \
         --quantization awq \

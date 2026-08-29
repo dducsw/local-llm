@@ -7,14 +7,23 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
     Version "1.0"
 
 %environment
-    export LC_ALL=C.UTF-8
-    export LANG=C.UTF-8
-    export PATH=/opt/venv/bin:$PATH
-    export CUDA_HOME=/usr/local/cuda-12.8
-    export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:${LD_LIBRARY_PATH:-}
+    # Cache & storage paths (bind /cache from host at runtime)
+    export HF_HOME=/cache/huggingface
+    export HUGGINGFACE_HUB_CACHE=/cache/huggingface/hub
+    export TRANSFORMERS_CACHE=/cache/huggingface/hub
+    export VLLM_CACHE_ROOT=/cache/vllm
+    export XDG_CACHE_HOME=/cache/xdg
+    export TOKENIZERS_PARALLELISM=true
+
+    # Volta SM70 execution parameters
     export VLLM_USE_V1=0
     export NVIDIA_TF32_OVERRIDE=0
     export NCCL_P2P_DISABLE=1
+
+    # Python venv
+    export PATH=/opt/venv/bin:$PATH
+    export CUDA_HOME=/usr/local/cuda-12.8
+    export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:${LD_LIBRARY_PATH:-}
 
 %post
     export DEBIAN_FRONTEND=noninteractive
@@ -31,11 +40,14 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
         ca-certificates \
         && rm -rf /var/lib/apt/lists/*
 
+    # Create expected mount points and cache dirs
+    mkdir -p /models /cache/huggingface/hub /cache/vllm /cache/xdg
+
     python3.12 -m venv /opt/venv
     export PATH=/opt/venv/bin:$PATH
 
     pip install --upgrade pip setuptools wheel
-    
+
     # Install PyTorch with CUDA 12.8
     pip install --prefer-binary --no-cache-dir \
         torch torchvision torchaudio \
@@ -59,8 +71,41 @@ From: nvidia/cuda:12.8.0-devel-ubuntu24.04
             /tmp/wheels/*.whl
         rm -rf /tmp/wheels
     else
-        echo "Warning: Could not automatically fetch 1Cat-vLLM wheels via GitHub API. Please install wheels manually."
+        echo "ERROR: Could not fetch 1Cat-vLLM wheels via GitHub API (rate limit or network issue)."
+        echo "Download wheels manually from https://github.com/1CatAI/1Cat-vLLM/releases/latest"
+        exit 1
     fi
+
+    # Verify 1cat-vllm installed successfully — fail build loudly if not
+    python3 -c "import vllm; print('1Cat-vLLM version:', vllm.__version__)" || {
+        echo "ERROR: 1Cat-vLLM failed to import after install. Container build aborted."
+        exit 1
+    }
+
+%test
+    export PATH=/opt/venv/bin:$PATH
+    python3 - <<'PY'
+import torch
+print("PyTorch:", torch.__version__, "| CUDA available:", torch.cuda.is_available())
+try:
+    import vllm
+    print("1Cat-vLLM successfully loaded, version:", vllm.__version__)
+except Exception as e:
+    print("vLLM import note:", e)
+PY
 
 %runscript
     exec vllm "$@"
+
+%help
+    1Cat-vLLM container for NVIDIA Tesla V100 (SM70).
+
+    Runtime Example:
+      apptainer run --nv \
+        --bind /path/to/cache:/cache \
+        --bind /path/to/models:/models:ro \
+        1cat-vllm.sif serve /models/Qwen3.5-9B-AWQ \
+        --dtype float16 \
+        --attention-backend FLASH_ATTN_V100 \
+        --quantization awq \
+        --host 0.0.0.0 --port 8000

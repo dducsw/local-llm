@@ -10,9 +10,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_MODEL="$ROOT/../models/Qwen3.5-9B-AWQ-INT4"
-if [ ! -d "$DEFAULT_MODEL" ] && [ -d "$HOME/dev/models/Qwen3.5-9B-AWQ-INT4" ]; then
-    DEFAULT_MODEL="$HOME/dev/models/Qwen3.5-9B-AWQ-INT4"
+DEFAULT_MODEL="$ROOT/../models/Qwen3.5-9B-AWQ"
+if [ ! -d "$DEFAULT_MODEL" ] && [ -d "$HOME/dev/models/Qwen3.5-9B-AWQ" ]; then
+    DEFAULT_MODEL="$HOME/dev/models/Qwen3.5-9B-AWQ"
 fi
 
 MODEL_PATH="${1:-$DEFAULT_MODEL}"

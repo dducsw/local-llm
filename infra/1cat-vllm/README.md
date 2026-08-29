@@ -30,9 +30,9 @@ local-llm/infra/1cat-vllm/
 
 ## 2. Recommended Model
 
-- **Model ID**: [`drawais/Qwen3.5-9B-AWQ-INT4`](https://huggingface.co/drawais/Qwen3.5-9B-AWQ-INT4)
+- **Model ID**: [`QuantTrio/Qwen3.5-9B-AWQ`](https://huggingface.co/QuantTrio/Qwen3.5-9B-AWQ)
 - **Quantization**: AWQ 4-bit (INT4) with native TurboMind SM70 kernel acceleration.
-- **Default Storage Path**: `/home/ducledinh/dev/models/Qwen3.5-9B-AWQ-INT4`
+- **Default Storage Path**: `/home/ducledinh/dev/models/Qwen3.5-9B-AWQ`
 
 ---
 
@@ -50,7 +50,7 @@ Build the standalone `.sif` image on a machine or node with build permissions:
 ### Step 2: Download Model
 Option A: Run the interactive script on Login Node:
 ```bash
-./download_model.sh /home/ducledinh/dev/models drawais/Qwen3.5-9B-AWQ-INT4
+./download_model.sh /home/ducledinh/dev/models QuantTrio/Qwen3.5-9B-AWQ
 ```
 
 Option B: Submit CPU Slurm batch job:
@@ -83,7 +83,7 @@ sbatch slurm/serving/vllm-1cat-multigpu.sbatch
 #### Custom Parameters:
 You can override parameters on submission:
 ```bash
-MODEL="Qwen3.5-9B-AWQ-INT4" \
+MODEL="Qwen3.5-9B-AWQ" \
 PORT=8000 \
 API_KEY="my-secret-key-123" \
 sbatch slurm/serving/vllm-1cat-singlegpu.sbatch
@@ -109,7 +109,7 @@ When ready, the server exposes an OpenAI-compatible API endpoint recorded in `lo
 job_id=12345
 node=gpunode2
 image=.../build/1cat-vllm.sif
-model=Qwen3.5-9B-AWQ-INT4
+model=Qwen3.5-9B-AWQ
 tp=1
 port=8000
 backend=FLASH_ATTN_V100 (SM70 TurboMind)

@@ -31,9 +31,9 @@ CONDA_ENV="${CONDA_ENV:-1cat-vllm-sm70}"
 CONDA_DIR="${CONDA_DIR:-$HOME/miniconda3}"
 
 # Model & Serving Parameters
-DEFAULT_MODEL="$PROJECT_DIR/../models/Qwen3.5-9B-AWQ-INT4"
-if [ ! -d "$DEFAULT_MODEL" ] && [ -d "$HOME/dev/models/Qwen3.5-9B-AWQ-INT4" ]; then
-    DEFAULT_MODEL="$HOME/dev/models/Qwen3.5-9B-AWQ-INT4"
+DEFAULT_MODEL="$PROJECT_DIR/../models/Qwen3.5-9B-AWQ"
+if [ ! -d "$DEFAULT_MODEL" ] && [ -d "$HOME/dev/models/Qwen3.5-9B-AWQ" ]; then
+    DEFAULT_MODEL="$HOME/dev/models/Qwen3.5-9B-AWQ"
 fi
 MODEL_PATH="${MODEL_PATH:-$DEFAULT_MODEL}"
 MODEL_ALIAS="${MODEL_ALIAS:-qwen3.5-9b}"
