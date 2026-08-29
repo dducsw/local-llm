@@ -37,23 +37,13 @@ PORT=${PORT:-8000}
 TP=1
 MAX_MODEL_LEN=${MAX_MODEL_LEN:-8192}
 GPU_MEM_UTIL=${GPU_MEM_UTIL:-0.90}
-API_KEY=${API_KEY:-dacn-qwen-secret-key}
+API_KEY=${API_KEY:-dacn-qwen-3.5-9b-secret-key}
 MODEL_ALIAS=${MODEL_ALIAS:-qwen3.5-9b}
+HEADNODE_IP="${HEADNODE_IP:-10.1.1.239}"
+TUNNEL_REMOTE_PORT="${TUNNEL_REMOTE_PORT:-18000}"
 ENDPOINT_FILE="$PWD/logs/endpoint-${SLURM_JOB_ID:-local}.json"
 
 mkdir -p "$CACHE_ROOT"/{huggingface,vllm,xdg,models} logs
-
-# Graceful signal handler for Slurm walltime expiration
-cleanup() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Received shutdown signal. Terminating 1Cat-vLLM..."
-  rm -f "$ENDPOINT_FILE"
-  if [[ -n "${VLLM_PID:-}" ]]; then
-    kill -TERM "$VLLM_PID" 2>/dev/null || true
-    wait "$VLLM_PID" 2>/dev/null || true
-  fi
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Clean shutdown complete."
-}
-trap cleanup SIGTERM SIGINT EXIT
 
 NODE_NAME=$(hostname)
 echo "job_id=${SLURM_JOB_ID:-local}"
@@ -63,6 +53,8 @@ echo "model=$MODEL"
 echo "tp=$TP"
 echo "port=$PORT"
 echo "backend=FLASH_ATTN_V100 (SM70 TurboMind)"
+echo "Internal Endpoint: http://${NODE_NAME}:${PORT}/v1"
+echo "Headnode Tunnel  : http://${HEADNODE_IP}:${TUNNEL_REMOTE_PORT}/v1"
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
 
 # Write endpoint information for client discovery / automated tunneling
@@ -71,11 +63,55 @@ cat <<EOF > "$ENDPOINT_FILE"
   "job_id": "${SLURM_JOB_ID:-local}",
   "node": "$NODE_NAME",
   "port": $PORT,
+  "headnode_ip": "$HEADNODE_IP",
+  "tunnel_port": $TUNNEL_REMOTE_PORT,
   "model": "$MODEL_ALIAS",
   "endpoint": "http://${NODE_NAME}:${PORT}/v1",
+  "headnode_endpoint": "http://${HEADNODE_IP}:${TUNNEL_REMOTE_PORT}/v1",
+  "api_key": "$API_KEY",
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
+
+# Resilient Reverse SSH Tunnel: Wait for server to be ready before establishing tunnel
+echo "Starting reverse SSH tunnel keep-alive loop: $NODE_NAME:$PORT -> $HEADNODE_IP:$TUNNEL_REMOTE_PORT..."
+(
+    # Wait until vLLM is healthy before opening the reverse tunnel to prevent 502 Bad Gateway
+    echo "[Tunnel Worker] Waiting for vLLM server to become healthy on port $PORT..."
+    while ! curl -s -f "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; do
+        sleep 3
+    done
+    echo "[Tunnel Worker] vLLM server is healthy! Opening reverse SSH tunnel..."
+
+    while true; do
+        ssh -N \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=5 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=3 \
+            -o ExitOnForwardFailure=yes \
+            -R "${TUNNEL_REMOTE_PORT}:127.0.0.1:${PORT}" \
+            "$HEADNODE_IP" || true
+        sleep 2
+    done
+) &
+TUNNEL_LOOP_PID=$!
+
+
+# Graceful signal handler for Slurm walltime expiration
+cleanup() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Received shutdown signal. Terminating 1Cat-vLLM and tunnel..."
+  rm -f "$ENDPOINT_FILE"
+  kill -TERM "$TUNNEL_LOOP_PID" 2>/dev/null || true
+  pkill -P "$TUNNEL_LOOP_PID" 2>/dev/null || true
+  if [[ -n "${VLLM_PID:-}" ]]; then
+    kill -TERM "$VLLM_PID" 2>/dev/null || true
+    wait "$VLLM_PID" 2>/dev/null || true
+  fi
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Clean shutdown complete."
+}
+trap cleanup SIGTERM SIGINT EXIT
+
 
 # 1. Attempt GPU Application Clock Pinning (Volta V100 SXM2 877MHz mem, 1530MHz sm)
 nvidia-smi -ac 877,1530 2>/dev/null || true
@@ -86,10 +122,11 @@ if command -v numactl &>/dev/null; then
   NUMA_PREFIX=(numactl --cpunodebind=0 --membind=0)
 fi
 
-# 3. Environment overrides for Volta V100 (SM70) stability
+# 3. Environment overrides for Volta V100 (SM70) stability & MTP speedup
 export VLLM_USE_V1=0
 export NVIDIA_TF32_OVERRIDE=0
 export NCCL_P2P_DISABLE=1
+export VLLM_1CAT_ENABLE_SM70_MTP_DEFAULTS="${ENABLE_MTP:-1}"
 
 # Resolve model location and bind mounts
 BIND_ARGS=("--bind" "$CACHE_ROOT:/cache")
@@ -123,11 +160,12 @@ echo "Resolved model path in container: $MODEL_ARG"
 # JSON string for --limit-mm-per-prompt (must be a single shell word)
 LIMIT_MM='{"image":0,"video":0}'
 
-# Run 1Cat-vLLM serving with FLASH_ATTN_V100 backend (VLLM_USE_V1=0 for Volta SM70)
+# Run 1Cat-vLLM serving with FLASH_ATTN_V100 backend (VLLM_USE_V1=0 for Volta SM70, MTP enabled)
 "${NUMA_PREFIX[@]}" apptainer run --nv --cleanenv \
-  --env VLLM_USE_V1=0,NVIDIA_TF32_OVERRIDE=0,NCCL_P2P_DISABLE=1 \
+  --env VLLM_USE_V1=0,NVIDIA_TF32_OVERRIDE=0,NCCL_P2P_DISABLE=1,VLLM_1CAT_ENABLE_SM70_MTP_DEFAULTS="$VLLM_1CAT_ENABLE_SM70_MTP_DEFAULTS" \
   "${BIND_ARGS[@]}" \
   "$IMAGE" \
+
   serve "$MODEL_ARG" \
   --host 0.0.0.0 \
   --port "$PORT" \

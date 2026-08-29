@@ -67,19 +67,32 @@ flowchart TB
 
 ---
 
+## ⚡ Inference Engines & Benchmark on Tesla V100 (SM70)
+
+Tested on **NVIDIA Tesla V100 SXM2 (16GB VRAM, Volta / SM70)** with **Qwen 3.5 9B**:
+
+| Engine Backend | Quantization / Format | Attention & Kernels | Throughput (Generation) | VRAM Footprint | Best Used For |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`llama.cpp`** | **GGUF** (`Q4_K_M`) | Native CUDA (cuBLAS) | **~80 tok/s** 🚀 | ~5.8 GB (~64% headroom) | Maximum single-stream speed, minimal memory |
+| **`1cat-vLLM`** *(vLLM Fork)* | **AWQ** (`INT4`) | `FLASH_ATTN_V100` + TurboMind SM70 | **~55 tok/s** ⚡ | ~7.2 GB (dynamic KV cache) | Batch throughput, continuous batching, prefix caching |
+
+---
+
 ## ✨ Key Capabilities
 
-1. **High-Throughput HPC Serving**:
-   - Optimized for single-GPU Volta V100 compute nodes using quantized GGUF weights (`Qwen3.5-9B-Q4_K_M.gguf`) occupying only **~5.8 GB VRAM**, leaving **64% VRAM headroom** for ultra-long context KV Caching.
-   - Pinned Apptainer container runtime (`vllm.sif`) running without root privileges.
+1. **Dual High-Throughput HPC Serving Backends**:
+   - **llama.cpp Engine (~80 tok/s)**: Super-fast single-GPU inference utilizing quantized GGUF weights (`Qwen3.5-9B-Q4_K_M.gguf`), occupying only **~5.8 GB VRAM** and leaving ample headroom for deep context windows.
+   - **1cat-vLLM Engine (~55 tok/s)**: Production vLLM engineering fork specifically optimized for Tesla V100 (SM70) with `FLASH_ATTN_V100` and TurboMind AWQ (`QuantTrio/Qwen3.5-9B-AWQ`), supporting continuous batching and prefix caching.
+   - Pinned Apptainer container runtimes running seamlessly without root privileges on Slurm compute nodes.
 
 2. **Full Observability & Token Dynamics**:
    - **Real-Time Speedometer**: Measures continuous token generation speed (`tok/s`), Time To First Token (`TTFT`), and end-to-end request latency.
    - **Interactive Chart.js Dashboard**: Dual-axis bar and line charts visualizing tokens generated per minute alongside cumulative token volume.
    - **Inference Audit Ledger**: Complete transaction history recording tokens, latency, status, and client keys.
 
-3. **Slurm Cluster Job Supervision**:
+3. **Slurm Cluster Job Supervision & Resilient Reverse Tunneling**:
    - Live cluster status polling displaying job IDs, compute nodes, partition state, and execution time directly on the web interface.
+   - Built-in automatic keep-alive reverse SSH tunnels connecting GPU compute nodes to Gateway nodes.
 
 4. **AI Chatbot Studio**:
    - Multi-turn conversational playground with persistent dialogue history.
@@ -104,27 +117,19 @@ local-llm/
 │   ├── architecture.md                 # System architecture & data flow diagrams
 │   └── infrastructure-deployment.md    # HPC, Slurm & Apptainer deployment guide
 ├── app/                                # Application Gateway & Web App
-│   ├── app/                            # FastAPI backend
-│   │   ├── __init__.py
-│   │   └── main.py                     # Proxy server, metrics collector & auth
-│   ├── config/                         # Upstream model routing config
-│   │   └── models.json
-│   ├── ui/                             # Frontend single-page application
-│   │   └── index.html                  # vLLMlocal UI (HTML, Tailwind, Marked, Chart.js)
+│   ├── app/                            # FastAPI backend (proxy, telemetry & auth)
+│   ├── config/                         # Upstream model routing config (models.json)
+│   ├── ui/                             # Frontend SPA (HTML, Tailwind, Marked, Chart.js)
 │   ├── data/                           # Local SQLite database (gateway.db)
 │   ├── examples/                       # Python SDK & cURL usage scripts
-│   ├── scripts/                        # Launcher & SSH tunnel scripts
-│   │   ├── run.sh                      # Gateway launcher
-│   │   └── ssh-tunnel.sh               # Port forward helper
-│   ├── .env.example                    # Local environment template
-│   └── requirements.txt                # Python dependencies
-└── infra/                              # HPC Infrastructure & Slurm
-    ├── build/                          # Container build directory
-    ├── defs/                           # Apptainer definition files (vllm.def)
-    ├── logs/                           # Slurm stdout and stderr logs
-    └── slurm/                          # Slurm batch submission scripts
-        ├── serving/                    # Model serving jobs (vllm-singlegpu.sbatch)
-        └── download/                   # Model download jobs (hf_download_qwen9b_gguf.sbatch)
+│   └── scripts/                        # Launcher & SSH tunnel scripts
+└── infra/                              # HPC Infrastructure, Backends & Slurm
+    ├── 1cat-vllm/                      # 1Cat-vLLM backend (~55 tok/s, FLASH_ATTN_V100, AWQ)
+    │   ├── defs/                       # Container definitions (1cat_vllm.def)
+    │   ├── slurm/                      # Serving & download batch scripts
+    │   └── run_qwen_1cat.sbatch        # Standalone 1Cat serving job
+    ├── llama-cpp/                      # llama.cpp backend (~80 tok/s, GGUF Q4_K_M)
+    └── vllm/                           # Standard vLLM backend & benchmarks
 ```
 
 ---
@@ -162,8 +167,8 @@ Open **`http://127.0.0.1:9001`** (or your public domain **`https://llm.ledinhduc
 
 ## 📚 Documentation Index
 
-- [API Keys & Model ACL Guide](file:///home/dev/local-llm/docs/api_acl.md)
-- [REST API Specifications](file:///home/dev/local-llm/docs/api-descriptions.md)
-- [Gateway & Dashboard User Guide](file:///home/dev/local-llm/docs/api-gateway.md)
-- [Architecture & Technical Design](file:///home/dev/local-llm/docs/architecture.md)
-- [HPC Infrastructure & Slurm Guide](file:///home/dev/local-llm/docs/infrastructure-deployment.md)
+- [API Keys & Model ACL Guide](docs/api_acl.md)
+- [REST API Specifications](docs/api-descriptions.md)
+- [Gateway & Dashboard User Guide](docs/api-gateway.md)
+- [Architecture & Technical Design](docs/architecture.md)
+- [HPC Infrastructure & Slurm Guide](docs/infrastructure-deployment.md)

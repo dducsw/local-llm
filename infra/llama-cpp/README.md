@@ -6,9 +6,9 @@ This document guides you through deploying the **Qwen 3.5 9B Instruct (GGUF `Q4_
 
 ## 1. File Structure in `infra/llama-cpp/`
 
-- [download-model.sh](file:///home/dev/local-llm/infra/llama-cpp/download-model.sh): Script to download the GGUF model to `/home/ducledinh/dev/models/`.
-- [run_qwen_server.sbatch](file:///home/dev/local-llm/infra/llama-cpp/run_qwen_server.sbatch): Slurm batch script to launch `llama-server` (CUDA) via Apptainer.
-- [README.md](file:///home/dev/local-llm/infra/llama-cpp/README.md): Overview and deployment guide for Slurm & Apptainer on HPC.
+- [download-model.sh](download-model.sh): Script to download the GGUF model to `/home/ducledinh/dev/models/`.
+- [run_qwen_server.sbatch](run_qwen_server.sbatch): Slurm batch script to launch `llama-server` (CUDA) via Apptainer.
+- [README.md](README.md): Overview and deployment guide for Slurm & Apptainer on HPC.
 
 ---
 

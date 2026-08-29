@@ -1,6 +1,6 @@
 # 1Cat-vLLM Infrastructure for Tesla V100 (SM70)
 
-This repository layout mirrors the structure of [`local-llm/infra/vllm`](file:///home/dev/local-llm/infra/vllm), purpose-built for building, serving, and testing **[1Cat-vLLM](https://github.com/1CatAI/1Cat-vLLM)** on **NVIDIA Tesla V100 (Volta / SM70)** GPUs with **`FLASH_ATTN_V100`** and **TurboMind AWQ** kernels.
+This repository layout mirrors the structure of [`local-llm/infra/vllm`](../vllm), purpose-built for building, serving, and testing **[1Cat-vLLM](https://github.com/1CatAI/1Cat-vLLM)** on **NVIDIA Tesla V100 (Volta / SM70)** GPUs with **`FLASH_ATTN_V100`** and **TurboMind AWQ** kernels.
 
 ---
 

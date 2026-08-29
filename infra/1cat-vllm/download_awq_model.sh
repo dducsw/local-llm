@@ -20,44 +20,61 @@ set -euo pipefail
 
 
 DEST_ROOT="${1:-$HOME/dev/models}"
-MODEL_DIR="$DEST_ROOT/Qwen3.5-9B-AWQ"
-BASE_URL="https://huggingface.co/QuantTrio/Qwen3.5-9B-AWQ/resolve/main"
+MODEL_NAME="Qwen3.5-9B-AWQ"
+MODEL_DIR="$DEST_ROOT/$MODEL_NAME"
+REPO_ID="QuantTrio/Qwen3.5-9B-AWQ"
 
 mkdir -p "$MODEL_DIR"
-cd "$MODEL_DIR"
 
 echo "=========================================================="
 echo " 1Cat-vLLM AWQ Model Downloader"
-echo " Model Repository : QuantTrio/Qwen3.5-9B-AWQ"
+echo " Model Repository : $REPO_ID"
 echo " Destination Dir  : $MODEL_DIR"
 echo "=========================================================="
 
-FILES=(
-    "config.json"
-    "generation_config.json"
-    "tokenizer.json"
-    "tokenizer_config.json"
-    "model.safetensors"
-)
+if command -v huggingface-cli &>/dev/null; then
+    echo ">> Using huggingface-cli for full snapshot download..."
+    huggingface-cli download "$REPO_ID" --local-dir "$MODEL_DIR" --local-dir-use-symlinks False
+elif python3 -c "import huggingface_hub" &>/dev/null; then
+    echo ">> Using huggingface_hub python package..."
+    python3 -c "
+from huggingface_hub import snapshot_download
+snapshot_download(repo_id='$REPO_ID', local_dir='$MODEL_DIR', local_dir_use_symlinks=False)
+"
+elif command -v python3 &>/dev/null; then
+    echo ">> Using Python API downloader to fetch all repo files dynamically..."
+    python3 - <<PY
+import os
+import json
+import urllib.request
 
-download_file() {
-    local file="$1"
-    local url="$BASE_URL/$file"
-    echo
-    echo ">> Downloading: $file ..."
-    if command -v wget &> /dev/null; then
-        wget -c --show-progress --progress=bar:force:noscroll "$url" -O "$file"
-    elif command -v curl &> /dev/null; then
-        curl -# -L -C - "$url" -o "$file"
-    else
-        echo "ERROR: Neither wget nor curl is available on this system."
-        exit 1
-    fi
-}
+repo = "$REPO_ID"
+dest = "$MODEL_DIR"
+os.makedirs(dest, exist_ok=True)
 
-for f in "${FILES[@]}"; do
-    download_file "$f"
-done
+api_url = f"https://huggingface.co/api/models/{repo}"
+req = urllib.request.Request(api_url, headers={"User-Agent": "1cat-vllm-downloader"})
+with urllib.request.urlopen(req) as resp:
+    data = json.loads(resp.read().decode())
+
+siblings = [f["rfilename"] for f in data.get("siblings", []) if not f["rfilename"].startswith(".")]
+print(f"Found {len(siblings)} files to download.")
+
+for idx, fname in enumerate(siblings, 1):
+    target_path = os.path.join(dest, fname)
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 0 and not fname.endswith(".safetensors"):
+        print(f"[{idx}/{len(siblings)}] Skipping already downloaded {fname}")
+        continue
+    file_url = f"https://huggingface.co/{repo}/resolve/main/{fname}"
+    print(f"[{idx}/{len(siblings)}] Downloading {fname} ...")
+    urllib.request.urlretrieve(file_url, target_path)
+print("All files downloaded successfully.")
+PY
+else
+    echo "ERROR: Python 3 is required to resolve repository file structure."
+    exit 1
+fi
 
 echo
 echo "=========================================================="
@@ -65,3 +82,4 @@ echo " Model download completed successfully!"
 echo " Location   : $MODEL_DIR"
 echo " Total size : $(du -sh "$MODEL_DIR" | cut -f1)"
 echo "=========================================================="
+
