@@ -1,24 +1,32 @@
 # ==============================================================================
-# V100-local — Application Gateway & UI Dockerfile
+# Local LLM Serving Gateway — Hardened Multi-Stage Dockerfile
 # ==============================================================================
-FROM python:3.11-slim
 
-# Install OpenSSH client (for remote Slurm HPC supervision) and curl (for healthchecks)
+# Stage 1: Build dependencies
+FROM python:3.11-slim-bookworm AS builder
+
+WORKDIR /build
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Stage 2: Minimal Runtime
+FROM python:3.11-slim-bookworm AS runtime
+
+# Install OpenSSH client (for Slurm SSH tunnel) and curl (for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /workspace
+# Copy installed Python packages from builder stage
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONUNBUFFERED=1
 
-# Install Python requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /workspace/app
 
 # Copy application source files
 COPY . /workspace/app
-
-WORKDIR /workspace/app
 
 # Ensure data and config directories exist
 RUN mkdir -p /workspace/app/data /workspace/app/config

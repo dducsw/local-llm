@@ -1,17 +1,29 @@
+import asyncio
 import json
 import time
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import StreamingResponse
 
-from app.config import MODELS, RECENT_LOGS
+from app.config import load_models
+from app.state import RECENT_LOGS
 from app.database import db
 from app.services.metrics_service import get_live_gpu_telemetry
 
 router = APIRouter(tags=["Telemetry & Metrics"])
 
+_TIMESERIES_CACHE: dict[str, tuple[float, dict]] = {}
+_REALTIME_CACHE: dict[str, tuple[float, dict]] = {}
+
 
 @router.get("/api/metrics/realtime")
 async def get_realtime_metrics():
-    """Return real-time telemetry summary."""
+    """Return real-time telemetry summary with 2s in-memory caching."""
+    now = time.time()
+    if "data" in _REALTIME_CACHE:
+        cached_ts, cached_val = _REALTIME_CACHE["data"]
+        if now - cached_ts < 2.0:
+            return cached_val
+
     with db() as conn:
         row = conn.execute(
             """
@@ -28,14 +40,15 @@ async def get_realtime_metrics():
         ).fetchone()
 
     # Calculate recent 5-minute throughput
-    recent_5m = [log for log in RECENT_LOGS if time.time() - log["created_at"] <= 300]
+    recent_5m = [log for log in RECENT_LOGS if now - log["created_at"] <= 300]
     recent_tok_s = round(sum(log["tok_per_sec"] for log in recent_5m) / len(recent_5m), 1) if recent_5m else 0.0
-    last_ttft = round(recent_5m[0]["ttft_ms"], 1) if recent_5m and recent_5m[0]["ttft_ms"] else 0.0
+    last_ttft = round(recent_5m[0]["ttft_ms"], 1) if recent_5m and recent_5m[0].get("ttft_ms") else 0.0
 
     gpu_telemetry = await get_live_gpu_telemetry()
+    models = load_models()
 
-    return {
-        "model": list(MODELS.keys())[0] if MODELS else "qwen3.5-9b",
+    val = {
+        "model": list(models.keys())[0] if models else "qwen3.5-9b",
         "total_requests": row["total_requests"] if row else len(RECENT_LOGS),
         "total_prompt_tokens": row["total_prompt_tokens"] if row else 0,
         "total_completion_tokens": row["total_completion_tokens"] if row else 0,
@@ -55,16 +68,56 @@ async def get_realtime_metrics():
         "vllm_running_reqs": gpu_telemetry.get("vllm_running_reqs", 0),
         "vllm_waiting_reqs": gpu_telemetry.get("vllm_waiting_reqs", 0),
         "status": gpu_telemetry.get("status", "STANDBY"),
+        "backend_type": gpu_telemetry.get("backend_type", "vLLM Engine"),
+        "active_node": gpu_telemetry.get("active_node"),
+        "active_job_id": gpu_telemetry.get("active_job_id"),
+        "upstream_target": models[list(models.keys())[0]].get("base_url", "http://127.0.0.1:18000") if models else "http://127.0.0.1:18000",
     }
+    _REALTIME_CACHE["data"] = (now, val)
+    return val
+
+
+@router.get("/api/metrics/live-stream")
+async def stream_live_metrics(request: Request):
+    """Server-Sent Events (SSE) stream pushing real-time metrics every 1.5s."""
+    async def event_generator():
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                data = await get_realtime_metrics()
+                yield f"data: {json.dumps(data)}\n\n"
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            await asyncio.sleep(1.5)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/api/metrics/timeseries")
 async def get_timeseries_metrics():
-    """Return three-minute time-series sampled in three-second intervals."""
-    now = int(time.time())
+    """Return three-minute time-series sampled in three-second intervals with O(N) bucketing."""
+    now_f = time.time()
+    now = int(now_f)
+
+    if "data" in _TIMESERIES_CACHE:
+        cached_ts, cached_val = _TIMESERIES_CACHE["data"]
+        if now_f - cached_ts < 2.0:
+            return cached_val
+
+    # Generate 60 buckets of 3-seconds each (180s total)
     buckets = []
     for i in range(59, -1, -1):
-        bucket_start = now - (i + 1) * 3
         bucket_end = now - i * 3
         label = time.strftime("%H:%M:%S", time.localtime(bucket_end))
         buckets.append({
@@ -77,6 +130,8 @@ async def get_timeseries_metrics():
             "tok_per_sec": 0.0,
         })
 
+    window_start = now - 180
+
     with db() as conn:
         rows = conn.execute(
             """
@@ -85,26 +140,32 @@ async def get_timeseries_metrics():
             WHERE created_at >= ?
             ORDER BY created_at ASC
             """,
-            (now - 900,),
+            (window_start,),
         ).fetchall()
 
+    # O(N) indexing directly into the appropriate bucket
     for r in rows:
         created = r["created_at"]
-        for b in buckets:
-            if b["timestamp"] - 3 <= created <= b["timestamp"]:
+        diff = now - created
+        if 0 <= diff < 180:
+            bucket_idx = 59 - (diff // 3)
+            if 0 <= bucket_idx < 60:
+                b = buckets[bucket_idx]
                 b["prompt_tokens"] += r["prompt_tokens"]
                 b["completion_tokens"] += r["completion_tokens"]
                 b["tokens"] += r["completion_tokens"]
                 b["requests"] += 1
-                b["tok_per_sec"] = max(b["tok_per_sec"], r["tok_per_sec"])
+                if r["tok_per_sec"] > b["tok_per_sec"]:
+                    b["tok_per_sec"] = r["tok_per_sec"]
 
     has_data = any(b["tokens"] > 0 for b in buckets)
     if not has_data and RECENT_LOGS:
         for idx, log_item in enumerate(list(RECENT_LOGS)[:15]):
             if idx < len(buckets):
-                buckets[len(buckets) - 1 - idx]["tokens"] = log_item["completion_tokens"]
-                buckets[len(buckets) - 1 - idx]["requests"] = 1
-                buckets[len(buckets) - 1 - idx]["tok_per_sec"] = log_item["tok_per_sec"]
+                pos = len(buckets) - 1 - idx
+                buckets[pos]["tokens"] = log_item.get("completion_tokens", 0)
+                buckets[pos]["requests"] = 1
+                buckets[pos]["tok_per_sec"] = log_item.get("tok_per_sec", 0.0)
 
     labels = [b["time"] for b in buckets]
     tokens_series = [b["tokens"] for b in buckets]
@@ -117,12 +178,14 @@ async def get_timeseries_metrics():
         total += val
         cumulative.append(total)
 
-    return {
+    result = {
         "labels": labels,
         "tokens_per_minute": tokens_per_minute,
         "cumulative_tokens": cumulative,
         "throughput_series": speed_series,
     }
+    _TIMESERIES_CACHE["data"] = (now_f, result)
+    return result
 
 
 @router.get("/api/metrics/logs")

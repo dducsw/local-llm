@@ -117,74 +117,176 @@ function updateChartColors() {
     throughputChart.update();
 }
 
+let sseEventSource = null;
+let sseReconnectTimer = null;
+
+function renderRealtimeMetrics(data) {
+    if (!data || data.error) return;
+
+    // 1. Active Serving Model Card
+    const modelName = document.getElementById('metric-model-name');
+    const modelUpstream = document.getElementById('metric-model-upstream');
+    const modelBadge = document.getElementById('metric-model-status-badge');
+    const modelProvider = document.getElementById('metric-model-provider');
+    const modelKvCache = document.getElementById('metric-model-kv-cache');
+
+    if (modelName) modelName.innerText = data.model || 'qwen3.5-9b';
+    if (modelUpstream) {
+        const upstream = data.upstream_target || '127.0.0.1:18000';
+        const backend = data.backend_type || 'vLLM Engine';
+        const nodeStr = data.active_node ? ` @ ${data.active_node}` : '';
+        modelUpstream.innerText = `${upstream} (${backend}${nodeStr})`;
+    }
+    
+    const statusText = data.status || 'SERVING';
+    if (modelBadge) {
+        modelBadge.innerText = statusText;
+        if (statusText === 'SERVING') {
+            modelBadge.className = 'px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold font-mono border border-emerald-200 dark:border-emerald-800/40';
+        } else if (statusText === 'WARMING_UP') {
+            modelBadge.className = 'px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 text-[10px] font-bold font-mono border border-amber-200 dark:border-amber-800/40';
+        } else {
+            modelBadge.className = 'px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold font-mono border border-slate-200 dark:border-slate-700';
+        }
+    }
+
+    if (modelKvCache) {
+        const kvFree = data.kv_cache_free_pct !== undefined ? Math.round(data.kv_cache_free_pct) : 100;
+        const running = data.vllm_running_reqs || 0;
+        modelKvCache.innerText = `${kvFree}% free • ${running} active`;
+    } else if (modelProvider) {
+        const running = data.vllm_running_reqs || 0;
+        modelProvider.innerText = `vLLM • ${running} active req`;
+    }
+
+    // 2. GPU VRAM & Hardware HUD Card
+    const vramUsage = document.getElementById('metric-vram-usage');
+    const vramTotal = document.getElementById('metric-vram-total');
+    const vramPct = document.getElementById('metric-vram-pct');
+    const vramBar = document.getElementById('metric-vram-bar');
+    const tempBadge = document.getElementById('metric-gpu-temp-badge');
+    const gpuUtil = document.getElementById('metric-gpu-util');
+    const gpuPower = document.getElementById('metric-gpu-power');
+
+    const usedGb = (data.vram_used_gb !== undefined && data.vram_used_gb !== null) ? data.vram_used_gb : 0.0;
+    const totalGb = (data.vram_total_gb !== undefined && data.vram_total_gb !== null) ? data.vram_total_gb : 16.0;
+    const pct = (data.vram_used_pct !== undefined && data.vram_used_pct !== null) ? data.vram_used_pct : Math.round((usedGb / (totalGb || 1)) * 100);
+
+    if (vramUsage) vramUsage.innerText = (typeof usedGb === 'number') ? usedGb.toFixed(1) : usedGb;
+    if (vramTotal) vramTotal.innerText = (typeof totalGb === 'number') ? totalGb.toFixed(1) : totalGb;
+    if (vramPct) vramPct.innerText = `${pct}%`;
+    if (vramBar) vramBar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+
+    const hudVram = document.getElementById('hud-vram');
+    if (hudVram) {
+        const usedFormatted = (typeof usedGb === 'number') ? usedGb.toFixed(1) : usedGb;
+        const totalFormatted = (typeof totalGb === 'number') ? Math.round(totalGb) : totalGb;
+        hudVram.innerText = `${usedFormatted} / ${totalFormatted} GB`;
+        hudVram.title = `VRAM: ${usedFormatted} / ${totalGb} GB (${pct}%)`;
+    }
+
+    if (tempBadge) {
+        tempBadge.innerText = data.gpu_temperature_c ? `${data.gpu_temperature_c}°C` : (data.status || 'ONLINE');
+    }
+    if (gpuUtil) gpuUtil.innerText = `${data.gpu_utilization_pct !== undefined ? data.gpu_utilization_pct : 0}`;
+    if (gpuPower) gpuPower.innerText = (data.gpu_power_w !== null && data.gpu_power_w !== undefined) ? `${Math.round(data.gpu_power_w)}` : '--';
+
+    // 3. Generation Speed & TTFT Card
+    const kpiSpeed = document.getElementById('metric-speed');
+    const kpiTtft = document.getElementById('metric-ttft');
+
+    if (kpiSpeed && data.current_tok_per_sec !== undefined && data.current_tok_per_sec !== null && data.current_tok_per_sec > 0) {
+        kpiSpeed.innerText = `${data.current_tok_per_sec}`;
+    }
+    if (kpiTtft && data.last_ttft_ms !== undefined && data.last_ttft_ms !== null && data.last_ttft_ms > 0) {
+        kpiTtft.innerText = `${data.last_ttft_ms.toFixed(0)} ms`;
+    }
+
+    // 4. Gateway Requests & Total Tokens Card
+    const kpiRequests = document.getElementById('metric-total-requests');
+    const kpiTokens = document.getElementById('metric-total-tokens');
+
+    if (kpiRequests) kpiRequests.innerText = (data.total_requests || 0).toLocaleString();
+    if (kpiTokens) kpiTokens.innerText = (data.total_tokens || 0).toLocaleString();
+
+    const promptTokens = document.getElementById('stat-prompt-tokens');
+    const completionTokens = document.getElementById('stat-completion-tokens');
+    const totalTokens = document.getElementById('stat-total-tokens');
+    const speedLabel = document.getElementById('stat-speed-label');
+    const speedBar = document.getElementById('stat-speed-bar');
+    if (promptTokens) promptTokens.innerText = (data.total_prompt_tokens || 0).toLocaleString();
+    if (completionTokens) completionTokens.innerText = (data.total_completion_tokens || 0).toLocaleString();
+    if (totalTokens) totalTokens.innerText = (data.total_tokens || 0).toLocaleString();
+    if (speedLabel) speedLabel.innerText = `${data.current_tok_per_sec || 0.0} tok/s`;
+    if (speedBar) speedBar.style.width = `${Math.min((data.current_tok_per_sec || 0) / 50 * 100, 100)}%`;
+}
+
+function updateSseStatus(isLive) {
+    const sseBadge = document.getElementById('telemetry-sse-status');
+    if (!sseBadge) return;
+    if (isLive) {
+        sseBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span><span class="text-emerald-400 font-semibold">LIVE (SSE)</span>`;
+        sseBadge.className = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono shadow-sm";
+    } else {
+        sseBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span><span class="text-amber-400 font-semibold">POLL (3s)</span>`;
+        sseBadge.className = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-mono shadow-sm";
+    }
+}
+
+function initRealtimeSSE() {
+    if (typeof EventSource === 'undefined') {
+        console.warn('Browser does not support SSE. Falling back to HTTP polling.');
+        updateSseStatus(false);
+        return;
+    }
+
+    if (sseEventSource) {
+        sseEventSource.close();
+        sseEventSource = null;
+    }
+
+    try {
+        sseEventSource = new EventSource(`${GATEWAY_BASE}/api/metrics/live-stream`);
+        
+        sseEventSource.onopen = () => {
+            updateSseStatus(true);
+        };
+
+        sseEventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                renderRealtimeMetrics(data);
+                updateSseStatus(true);
+            } catch (err) {
+                console.debug('Failed to parse SSE telemetry packet:', err);
+            }
+        };
+
+        sseEventSource.onerror = () => {
+            updateSseStatus(false);
+            if (sseEventSource) {
+                sseEventSource.close();
+                sseEventSource = null;
+            }
+            if (!sseReconnectTimer) {
+                sseReconnectTimer = setTimeout(() => {
+                    sseReconnectTimer = null;
+                    initRealtimeSSE();
+                }, 5000);
+            }
+        };
+    } catch (e) {
+        updateSseStatus(false);
+    }
+}
+
 async function fetchRealtimeMetrics() {
+    // Fallback or explicit trigger
     try {
         const res = await fetch(`${GATEWAY_BASE}/api/metrics/realtime`);
         if (!res.ok) return;
         const data = await res.json();
-
-        // 1. Active Serving Model Card
-        const modelName = document.getElementById('metric-model-name');
-        const modelUpstream = document.getElementById('metric-model-upstream');
-        const modelBadge = document.getElementById('metric-model-status-badge');
-        const modelProvider = document.getElementById('metric-model-provider');
-
-        if (modelName) modelName.innerText = data.model || 'qwen3.5-9b';
-        if (modelUpstream) modelUpstream.innerText = '127.0.0.1:18000 (vLLM Engine)';
-        if (modelBadge) {
-            modelBadge.innerText = 'SERVING';
-            modelBadge.className = 'px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold font-mono border border-emerald-200 dark:border-emerald-800/40';
-        }
-        if (modelProvider) modelProvider.innerText = 'vLLM • QOS gpu-q';
-
-        // 2. GPU VRAM & Hardware HUD Card
-        const vramUsage = document.getElementById('metric-vram-usage');
-        const vramTotal = document.getElementById('metric-vram-total');
-        const vramPct = document.getElementById('metric-vram-pct');
-        const vramBar = document.getElementById('metric-vram-bar');
-        const tempBadge = document.getElementById('metric-gpu-temp-badge');
-        const gpuUtil = document.getElementById('metric-gpu-util');
-        const gpuPower = document.getElementById('metric-gpu-power');
-
-        const usedGb = (data.vram_used_gb !== undefined && data.vram_used_gb !== null) ? data.vram_used_gb : 0.0;
-        const totalGb = (data.vram_total_gb !== undefined && data.vram_total_gb !== null) ? data.vram_total_gb : 32.0;
-        const pct = (data.vram_used_pct !== undefined && data.vram_used_pct !== null) ? data.vram_used_pct : Math.round((usedGb / (totalGb || 1)) * 100);
-
-        if (vramUsage) vramUsage.innerText = (typeof usedGb === 'number') ? usedGb.toFixed(1) : usedGb;
-        if (vramTotal) vramTotal.innerText = (typeof totalGb === 'number') ? totalGb.toFixed(1) : totalGb;
-        if (vramPct) vramPct.innerText = `${pct}%`;
-        if (vramBar) vramBar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
-
-        if (tempBadge) {
-            tempBadge.innerText = data.gpu_temperature_c ? `${data.gpu_temperature_c}°C` : (data.status || 'ONLINE');
-        }
-        if (gpuUtil) gpuUtil.innerText = `${data.gpu_utilization_pct !== undefined ? data.gpu_utilization_pct : 0}`;
-        if (gpuPower) gpuPower.innerText = (data.gpu_power_w !== null && data.gpu_power_w !== undefined) ? `${Math.round(data.gpu_power_w)}` : '--';
-
-        // 3. Generation Speed & TTFT Card
-        const kpiSpeed = document.getElementById('metric-speed');
-        const kpiTtft = document.getElementById('metric-ttft');
-
-        if (kpiSpeed) kpiSpeed.innerText = `${data.current_tok_per_sec || 0.0}`;
-        if (kpiTtft) kpiTtft.innerText = `${data.last_ttft_ms ? data.last_ttft_ms.toFixed(0) : '0'} ms`;
-
-        // 4. Gateway Requests & Total Tokens Card
-        const kpiRequests = document.getElementById('metric-total-requests');
-        const kpiTokens = document.getElementById('metric-total-tokens');
-
-        if (kpiRequests) kpiRequests.innerText = (data.total_requests || 0).toLocaleString();
-        if (kpiTokens) kpiTokens.innerText = (data.total_tokens || 0).toLocaleString();
-
-        const promptTokens = document.getElementById('stat-prompt-tokens');
-        const completionTokens = document.getElementById('stat-completion-tokens');
-        const totalTokens = document.getElementById('stat-total-tokens');
-        const speedLabel = document.getElementById('stat-speed-label');
-        const speedBar = document.getElementById('stat-speed-bar');
-        if (promptTokens) promptTokens.innerText = (data.total_prompt_tokens || 0).toLocaleString();
-        if (completionTokens) completionTokens.innerText = (data.total_completion_tokens || 0).toLocaleString();
-        if (totalTokens) totalTokens.innerText = (data.total_tokens || 0).toLocaleString();
-        if (speedLabel) speedLabel.innerText = `${data.current_tok_per_sec || 0.0} tok/s`;
-        if (speedBar) speedBar.style.width = `${Math.min((data.current_tok_per_sec || 0) / 50 * 100, 100)}%`;
+        renderRealtimeMetrics(data);
     } catch (err) {
         console.debug('Failed to fetch realtime metrics:', err);
     }
@@ -220,6 +322,26 @@ async function fetchMetricsLogs() {
         if (!tbody) return;
 
         const logs = data.logs || [];
+        if (logs.length > 0) {
+            const latest = logs[0];
+            const hudSpeed = document.getElementById('hud-speed');
+            const hudTtft = document.getElementById('hud-ttft');
+            const statusPill = document.getElementById('play-status-pill');
+            const isInferRunning = abortController !== null;
+            if (hudSpeed && !isInferRunning && latest.tok_per_sec) {
+                const spd = typeof latest.tok_per_sec === 'number' ? latest.tok_per_sec.toFixed(1) : latest.tok_per_sec;
+                hudSpeed.innerText = `${spd} tok/s`;
+            }
+            if (hudTtft && !isInferRunning && latest.ttft_ms) {
+                const ttft = typeof latest.ttft_ms === 'number' ? latest.ttft_ms.toFixed(0) : latest.ttft_ms;
+                hudTtft.innerText = `${ttft} ms`;
+            }
+            if (statusPill && !isInferRunning && latest.tok_per_sec) {
+                const spd = typeof latest.tok_per_sec === 'number' ? latest.tok_per_sec.toFixed(1) : latest.tok_per_sec;
+                statusPill.innerText = `Latest: ${spd} tok/s`;
+                statusPill.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-neon-500/15 text-neon-500 border border-neon-500/30';
+            }
+        }
         if (logs.length === 0) {
             tbody.innerHTML = `
                 <tr>

@@ -10,7 +10,6 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.config import (
     MAX_CONCURRENT_PER_KEY,
     MAX_CONCURRENT_REQUESTS,
-    MODELS,
     UPSTREAM_TIMEOUT,
     load_models,
     log,
@@ -18,6 +17,16 @@ from app.config import (
 from app.database import record_telemetry
 from app.schemas import Identity
 from app.services.auth_service import allowed, enforce_rpm
+from app.services.langfuse_service import log_generation_trace
+from app.services.metrics_service import (
+    LLM_ACTIVE_REQUESTS,
+    LLM_LATENCY_SECONDS,
+    LLM_REQUESTS_TOTAL,
+    LLM_TOKENS_PER_SEC,
+    LLM_TOKENS_TOTAL,
+    LLM_TTFT_SECONDS,
+    LLM_UPSTREAM_ERRORS_TOTAL,
+)
 
 _CLIENT: httpx.AsyncClient | None = None
 _GLOBAL_SEMAPHORE = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
@@ -30,11 +39,16 @@ class ConcurrencyGuard:
 
     def __init__(self, identity: Identity):
         self.identity = identity
-        self.acquired = False
+        self.global_acquired = False
+        self.key_acquired = False
 
-    async def __aenter__(self):
-        # Non-blocking acquisition check
-        if _GLOBAL_SEMAPHORE.locked():
+    async def acquire(self):
+        key_sem = _KEY_SEMAPHORES[self.identity.id]
+
+        try:
+            await asyncio.wait_for(_GLOBAL_SEMAPHORE.acquire(), timeout=0.1)
+            self.global_acquired = True
+        except asyncio.TimeoutError:
             raise HTTPException(
                 status_code=429,
                 detail={
@@ -46,8 +60,12 @@ class ConcurrencyGuard:
                 headers={"Retry-After": "2"},
             )
 
-        key_sem = _KEY_SEMAPHORES[self.identity.id]
-        if key_sem.locked():
+        try:
+            await asyncio.wait_for(key_sem.acquire(), timeout=0.1)
+            self.key_acquired = True
+            _ACTIVE_KEY_REQUESTS[self.identity.id] += 1
+        except asyncio.TimeoutError:
+            self.release()
             raise HTTPException(
                 status_code=429,
                 detail={
@@ -59,40 +77,27 @@ class ConcurrencyGuard:
                 headers={"Retry-After": "2"},
             )
 
-        try:
-            await asyncio.wait_for(_GLOBAL_SEMAPHORE.acquire(), timeout=0.1)
-            await asyncio.wait_for(key_sem.acquire(), timeout=0.1)
-            _ACTIVE_KEY_REQUESTS[self.identity.id] += 1
-            self.acquired = True
-            return self
-        except asyncio.TimeoutError:
-            if self.acquired:
-                _GLOBAL_SEMAPHORE.release()
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "error": {
-                        "message": "Concurrency limit saturated under heavy load. Please retry in a moment.",
-                        "type": "concurrency_limit_error",
-                    }
-                },
-                headers={"Retry-After": "2"},
-            )
+    async def __aenter__(self):
+        await self.acquire()
+        return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         self.release()
 
     def release(self):
-        if self.acquired:
-            self.acquired = False
+        if self.key_acquired:
+            self.key_acquired = False
             _ACTIVE_KEY_REQUESTS[self.identity.id] = max(0, _ACTIVE_KEY_REQUESTS[self.identity.id] - 1)
             try:
                 _KEY_SEMAPHORES[self.identity.id].release()
-            except Exception:
+            except ValueError:
                 pass
+
+        if self.global_acquired:
+            self.global_acquired = False
             try:
                 _GLOBAL_SEMAPHORE.release()
-            except Exception:
+            except ValueError:
                 pass
 
 
@@ -114,17 +119,6 @@ async def close_upstream_client() -> None:
         except Exception:
             pass
         _CLIENT = None
-
-
-from app.services.metrics_service import (
-    LLM_ACTIVE_REQUESTS,
-    LLM_LATENCY_SECONDS,
-    LLM_REQUESTS_TOTAL,
-    LLM_TOKENS_PER_SEC,
-    LLM_TOKENS_TOTAL,
-    LLM_TTFT_SECONDS,
-    LLM_UPSTREAM_ERRORS_TOTAL,
-)
 
 
 async def proxy_openai(
@@ -184,7 +178,7 @@ async def proxy_openai(
 
     client = get_upstream_client()
     guard = ConcurrencyGuard(identity)
-    await guard.__aenter__()
+    await guard.acquire()
 
     if not stream:
         try:
@@ -250,6 +244,28 @@ async def proxy_openai(
 
             record_telemetry(rid, public_model, p_tok, c_tok, t_tok, elapsed, None, tok_s, f"{resp.status_code} OK", identity.prefix)
 
+            # Fire-and-forget Langfuse trace
+            extracted_output = ""
+            if isinstance(body, dict):
+                choices = body.get("choices", [])
+                if choices and isinstance(choices, list):
+                    msg = choices[0].get("message", {})
+                    extracted_output = msg.get("content", "") if isinstance(msg, dict) else choices[0].get("text", "")
+
+            log_generation_trace(
+                request_id=rid,
+                model=public_model,
+                input_data=payload.get("messages") or payload.get("prompt"),
+                output_text=extracted_output,
+                prompt_tokens=p_tok,
+                completion_tokens=c_tok,
+                total_tokens=t_tok,
+                latency_ms=elapsed,
+                ttft_ms=None,
+                user_id=identity.prefix,
+                metadata={"stream": False, "status_code": resp.status_code},
+            )
+
             return JSONResponse(
                 status_code=resp.status_code,
                 headers={"X-Request-ID": rid},
@@ -259,54 +275,59 @@ async def proxy_openai(
             guard.release()
 
     # Streaming mode
-    upstream_request = client.build_request(
-        "POST", upstream_url, json=upstream_payload, headers=headers
-    )
     try:
-        resp = await client.send(upstream_request, stream=True)
-    except httpx.HTTPError as exc:
-        guard.release()
-        LLM_UPSTREAM_ERRORS_TOTAL.labels(model=public_model, error_type=type(exc).__name__).inc()
-        LLM_REQUESTS_TOTAL.labels(model=public_model, status="502", key_prefix=identity.prefix, stream="True").inc()
-        elapsed = (time.perf_counter() - started) * 1000
-        record_telemetry(rid, public_model, 0, 0, 0, elapsed, None, 0.0, "502 Upstream Error", identity.prefix)
-        return JSONResponse(
-            status_code=502,
-            headers={"X-Request-ID": rid},
-            content={
-                "error": {
-                    "message": f"Upstream unavailable: {type(exc).__name__}",
-                    "type": "upstream_error",
-                }
-            },
+        upstream_request = client.build_request(
+            "POST", upstream_url, json=upstream_payload, headers=headers
         )
+        try:
+            resp = await client.send(upstream_request, stream=True)
+        except httpx.HTTPError as exc:
+            guard.release()
+            LLM_UPSTREAM_ERRORS_TOTAL.labels(model=public_model, error_type=type(exc).__name__).inc()
+            LLM_REQUESTS_TOTAL.labels(model=public_model, status="502", key_prefix=identity.prefix, stream="True").inc()
+            elapsed = (time.perf_counter() - started) * 1000
+            record_telemetry(rid, public_model, 0, 0, 0, elapsed, None, 0.0, "502 Upstream Error", identity.prefix)
+            return JSONResponse(
+                status_code=502,
+                headers={"X-Request-ID": rid},
+                content={
+                    "error": {
+                        "message": f"Upstream unavailable: {type(exc).__name__}",
+                        "type": "upstream_error",
+                    }
+                },
+            )
 
-    if resp.status_code >= 400:
+        if resp.status_code >= 400:
+            guard.release()
+            content = await resp.aread()
+            await resp.aclose()
+            elapsed = (time.perf_counter() - started) * 1000
+            LLM_REQUESTS_TOTAL.labels(model=public_model, status=str(resp.status_code), key_prefix=identity.prefix, stream="True").inc()
+            record_telemetry(rid, public_model, 0, 0, 0, elapsed, None, 0.0, f"{resp.status_code} Error", identity.prefix)
+            return JSONResponse(
+                status_code=resp.status_code,
+                headers={"X-Request-ID": rid},
+                content={
+                    "error": {
+                        "message": content.decode(errors="replace"),
+                        "type": "upstream_error",
+                    }
+                },
+            )
+    except Exception:
         guard.release()
-        content = await resp.aread()
-        await resp.aclose()
-        elapsed = (time.perf_counter() - started) * 1000
-        LLM_REQUESTS_TOTAL.labels(model=public_model, status=str(resp.status_code), key_prefix=identity.prefix, stream="True").inc()
-        record_telemetry(rid, public_model, 0, 0, 0, elapsed, None, 0.0, f"{resp.status_code} Error", identity.prefix)
-        return JSONResponse(
-            status_code=resp.status_code,
-            headers={"X-Request-ID": rid},
-            content={
-                "error": {
-                    "message": content.decode(errors="replace"),
-                    "type": "upstream_error",
-                }
-            },
-        )
+        raise
 
     first_chunk_ts: float | None = None
     stream_buffer = ""
     prompt_tokens_exact: int | None = None
     completion_tokens_exact: int | None = None
     delta_text_chars = 0
+    full_stream_text = ""
 
     async def stream_iter():
-        nonlocal first_chunk_ts, stream_buffer, prompt_tokens_exact, completion_tokens_exact, delta_text_chars
+        nonlocal first_chunk_ts, stream_buffer, prompt_tokens_exact, completion_tokens_exact, delta_text_chars, full_stream_text
         try:
             async for chunk in resp.aiter_raw():
                 if await request.is_disconnected():
@@ -328,20 +349,19 @@ async def proxy_openai(
                                 try:
                                     parsed = json.loads(data_str)
                                     if isinstance(parsed, dict):
-                                        # Extract token usage if engine provided usage chunk
                                         usage = parsed.get("usage")
                                         if isinstance(usage, dict):
                                             if "prompt_tokens" in usage and usage["prompt_tokens"] is not None:
                                                 prompt_tokens_exact = int(usage["prompt_tokens"])
                                             if "completion_tokens" in usage and usage["completion_tokens"] is not None:
                                                 completion_tokens_exact = int(usage["completion_tokens"])
-                                        # Count generated text chars as fallback for token estimation
                                         choices = parsed.get("choices", [])
                                         if choices and isinstance(choices, list):
                                             delta = choices[0].get("delta", {})
                                             content = delta.get("content", "")
                                             if content:
                                                 delta_text_chars += len(content)
+                                                full_stream_text += content
                                 except Exception:
                                     pass
                     except Exception:
@@ -358,7 +378,6 @@ async def proxy_openai(
 
             ttft = ((first_chunk_ts - started) * 1000) if first_chunk_ts else None
 
-            # Calculate accurate prompt tokens
             if prompt_tokens_exact is not None:
                 p_tok = prompt_tokens_exact
             else:
@@ -366,7 +385,6 @@ async def proxy_openai(
                 p_text = json.dumps(messages) if messages else upstream_payload.get("prompt", "")
                 p_tok = max(1, len(str(p_text)) // 4)
 
-            # Calculate accurate completion tokens
             if completion_tokens_exact is not None:
                 c_tok = completion_tokens_exact
             elif delta_text_chars > 0:
@@ -393,6 +411,22 @@ async def proxy_openai(
                 f"{resp.status_code} Stream OK",
                 identity.prefix,
             )
+
+            # Fire-and-forget Langfuse trace
+            log_generation_trace(
+                request_id=rid,
+                model=public_model,
+                input_data=upstream_payload.get("messages") or upstream_payload.get("prompt"),
+                output_text=full_stream_text,
+                prompt_tokens=p_tok,
+                completion_tokens=c_tok,
+                total_tokens=p_tok + c_tok,
+                latency_ms=total_elapsed,
+                ttft_ms=ttft,
+                user_id=identity.prefix,
+                metadata={"stream": True, "status_code": resp.status_code},
+            )
+
             log.info(
                 "end stream request_id=%s key=%s model=%s tokens=%d/%d latency_ms=%.1f ttft_ms=%s tok_s=%.1f",
                 rid, identity.prefix, public_model, p_tok, c_tok, total_elapsed,
@@ -402,8 +436,11 @@ async def proxy_openai(
     return StreamingResponse(
         stream_iter(),
         status_code=resp.status_code,
-        headers={"X-Request-ID": rid, "Content-Type": resp.headers.get("content-type", "text/event-stream")},
+        headers={
+            "X-Request-ID": rid,
+            "Content-Type": resp.headers.get("content-type", "text/event-stream"),
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
         media_type=resp.headers.get("content-type", "text/event-stream"),
     )
-
-

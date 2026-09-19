@@ -6,10 +6,12 @@ from fastapi import Header, HTTPException
 
 from app.config import (
     ADMIN_PASSWORD,
-    ADMIN_SESSIONS,
     ADMIN_TOKEN,
+    VIEWER_PASSWORD,
+    VIEWER_USERNAME,
     WINDOWS,
 )
+from app.state import ADMIN_SESSIONS
 from app.database import db
 from app.schemas import Identity
 
@@ -32,14 +34,23 @@ def bearer(authorization: str | None) -> str:
     return authorization.split(" ", 1)[1].strip()
 
 
+def _extract_token(
+    x_admin_token: str | None = None,
+    x_admin_session: str | None = None,
+    authorization: str | None = None,
+) -> str | None:
+    token = x_admin_session or x_admin_token
+    if not token and authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    return token.strip() if token else None
+
+
 def require_admin(
     x_admin_token: str | None = Header(default=None),
     x_admin_session: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
 ) -> str:
-    token_to_check = x_admin_session or x_admin_token
-    if not token_to_check and authorization and authorization.lower().startswith("bearer "):
-        token_to_check = authorization.split(" ", 1)[1].strip()
+    token_to_check = _extract_token(x_admin_token, x_admin_session, authorization)
 
     if not token_to_check:
         raise HTTPException(
@@ -57,7 +68,19 @@ def require_admin(
         sess = ADMIN_SESSIONS[token_to_check]
         exp = sess["expires_at"] if isinstance(sess, dict) else sess
         username = sess.get("username", "admin") if isinstance(sess, dict) else "admin"
+        role = sess.get("role", "admin") if isinstance(sess, dict) else "admin"
+
         if time.time() < exp:
+            if role != "admin":
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": {
+                            "message": "Action requires Administrator privileges",
+                            "type": "permission_denied",
+                        }
+                    },
+                )
             return username
         else:
             ADMIN_SESSIONS.pop(token_to_check, None)
@@ -77,6 +100,18 @@ def require_admin(
     ):
         return "admin"
 
+    # If viewer token provided to admin-only endpoint
+    if VIEWER_PASSWORD and secrets.compare_digest(token_to_check, VIEWER_PASSWORD):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": {
+                    "message": "Action requires Administrator privileges",
+                    "type": "permission_denied",
+                }
+            },
+        )
+
     raise HTTPException(
         status_code=401,
         detail={
@@ -88,18 +123,70 @@ def require_admin(
     )
 
 
+def require_viewer_or_admin(
+    x_admin_token: str | None = Header(default=None),
+    x_admin_session: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+) -> str:
+    token_to_check = _extract_token(x_admin_token, x_admin_session, authorization)
+
+    if not token_to_check:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": {
+                    "message": "Authentication required",
+                    "type": "authentication_error",
+                }
+            },
+        )
+
+    # 1. Check active session token
+    if token_to_check in ADMIN_SESSIONS:
+        sess = ADMIN_SESSIONS[token_to_check]
+        exp = sess["expires_at"] if isinstance(sess, dict) else sess
+        username = sess.get("username", "user") if isinstance(sess, dict) else "user"
+
+        if time.time() < exp:
+            return username
+        else:
+            ADMIN_SESSIONS.pop(token_to_check, None)
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "error": {
+                        "message": "Session has expired, please log in again",
+                        "type": "authentication_error",
+                    }
+                },
+            )
+
+    # 2. Check direct credentials
+    if (ADMIN_PASSWORD and secrets.compare_digest(token_to_check, ADMIN_PASSWORD)) or (
+        ADMIN_TOKEN and secrets.compare_digest(token_to_check, ADMIN_TOKEN)
+    ):
+        return "admin"
+
+    if VIEWER_PASSWORD and secrets.compare_digest(token_to_check, VIEWER_PASSWORD):
+        return VIEWER_USERNAME
+
+    raise HTTPException(
+        status_code=401,
+        detail={
+            "error": {
+                "message": "Invalid authentication credentials",
+                "type": "authentication_error",
+            }
+        },
+    )
+
+
 def require_api_key(
     authorization: str | None = Header(default=None),
     x_admin_session: str | None = Header(default=None),
     x_admin_token: str | None = Header(default=None),
 ) -> Identity:
-    raw = ""
-    if authorization and authorization.lower().startswith("bearer "):
-        raw = authorization.split(" ", 1)[1].strip()
-    elif x_admin_session:
-        raw = x_admin_session.strip()
-    elif x_admin_token:
-        raw = x_admin_token.strip()
+    raw = _extract_token(x_admin_token, x_admin_session, authorization)
 
     if not raw:
         raise HTTPException(
@@ -112,7 +199,7 @@ def require_api_key(
             },
         )
 
-    # 1. Check Admin Master Token or valid Admin Session
+    # 1. Check Admin Master Token
     if (ADMIN_PASSWORD and secrets.compare_digest(raw, ADMIN_PASSWORD)) or (
         ADMIN_TOKEN and secrets.compare_digest(raw, ADMIN_TOKEN)
     ):
@@ -124,16 +211,31 @@ def require_api_key(
             rpm=10000,
         )
 
+    # Check Viewer Direct Token
+    if VIEWER_PASSWORD and secrets.compare_digest(raw, VIEWER_PASSWORD):
+        return Identity(
+            id=-1,
+            prefix="viewer",
+            name="Viewer Token",
+            allowed_models=["*"],
+            rpm=120,
+        )
+
+    # 2. Check Active Session
     if raw in ADMIN_SESSIONS:
         sess = ADMIN_SESSIONS[raw]
         exp = sess["expires_at"] if isinstance(sess, dict) else sess
+        role = sess.get("role", "admin") if isinstance(sess, dict) else "admin"
+        username = sess.get("username", "user") if isinstance(sess, dict) else "user"
+
         if time.time() < exp:
+            rpm = 10000 if role == "admin" else 120
             return Identity(
-                id=0,
-                prefix="admin",
-                name="Admin Session",
+                id=0 if role == "admin" else -1,
+                prefix=role,
+                name=f"{username.capitalize()} Session",
                 allowed_models=["*"],
-                rpm=10000,
+                rpm=rpm,
             )
         else:
             ADMIN_SESSIONS.pop(raw, None)
@@ -147,7 +249,7 @@ def require_api_key(
                 },
             )
 
-    # 2. Check Database API Keys
+    # 3. Check Database API Keys
     with db() as conn:
         row = conn.execute(
             """

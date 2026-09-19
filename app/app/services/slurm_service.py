@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shlex
 import shutil
 import subprocess
 import time
@@ -14,6 +15,18 @@ _CACHE: dict[str, tuple[float, tuple[int, str, str]]] = {}
 _CACHE_TTL = 2.5  # seconds for read queries (sinfo, squeue)
 
 
+def get_cluster_status() -> dict:
+    """Check connectivity and operational mode of Slurm cluster."""
+    has_local = bool(shutil.which("sinfo"))
+    has_ssh = bool(HPC_SSH_HOST and HPC_SSH_HOST != "your-host")
+    mode = "local" if has_local else ("ssh" if has_ssh else "mock")
+    return {
+        "configured": has_local or has_ssh,
+        "mode": mode,
+        "target": f"{HPC_SSH_USER}@{HPC_SSH_HOST}" if has_ssh else ("localhost" if has_local else "mock"),
+    }
+
+
 def run_slurm_cli(
     cmd_args: list[str],
     timeout: float = 8.0,
@@ -26,12 +39,19 @@ def run_slurm_cli(
     cache_key = ""
 
     if use_cache and binary in ("sinfo", "squeue"):
-        cache_key = " ".join(cmd_args) + (f"@{work_dir}" if work_dir else "")
+        cache_key = f"{HPC_SSH_HOST}:{' '.join(cmd_args)}" + (f"@{work_dir}" if work_dir else "")
         now = time.time()
         if cache_key in _CACHE:
             cached_time, cached_res = _CACHE[cache_key]
             if now - cached_time < _CACHE_TTL:
                 return cached_res
+
+    # Clean old cache entries occasionally
+    if len(_CACHE) > 50:
+        now = time.time()
+        stale_keys = [k for k, (t, _) in _CACHE.items() if now - t > 30.0]
+        for k in stale_keys:
+            _CACHE.pop(k, None)
 
     # 1. Local execution if binary installed
     if shutil.which(binary) and not remote_only:
@@ -50,13 +70,19 @@ def run_slurm_cli(
     # 2. Remote SSH execution if HPC_SSH_HOST configured (VM -> HPC)
     if HPC_SSH_HOST and HPC_SSH_HOST != "your-host":
         try:
-            import shlex
             cmd_str = " ".join(shlex.quote(arg) for arg in cmd_args)
             if work_dir:
                 remote_cmd_str = f"cd {shlex.quote(work_dir)} && {cmd_str}"
             else:
                 remote_cmd_str = cmd_str
-            ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
+            ssh_cmd = [
+                "ssh",
+                "-o", "StrictHostKeyChecking=no",
+                "-o", "ConnectTimeout=5",
+                "-o", "BatchMode=yes",
+                "-o", "ServerAliveInterval=15",
+                "-o", "ServerAliveCountMax=3",
+            ]
             if HPC_SSH_KEY and os.path.exists(os.path.expanduser(HPC_SSH_KEY)):
                 ssh_cmd.extend(["-i", os.path.expanduser(HPC_SSH_KEY)])
             target = f"{HPC_SSH_USER}@{HPC_SSH_HOST}" if HPC_SSH_USER else HPC_SSH_HOST
@@ -84,4 +110,3 @@ async def run_slurm_cli_async(
 ) -> tuple[int, str, str]:
     """Execute Slurm CLI in an asyncio threadpool to avoid blocking the main server loop."""
     return await asyncio.to_thread(run_slurm_cli, cmd_args, timeout, work_dir, use_cache, remote_only)
-

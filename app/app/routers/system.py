@@ -1,10 +1,10 @@
+import httpx
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, Response
 
-from app.config import APP_DIR, MODELS
+from app.config import APP_DIR, GATEWAY_VERSION, load_models
 from app.services.metrics_service import LLM_SSH_TUNNEL_UP, export_prometheus_metrics
 from app.services.tunnel_service import TUNNEL_MANAGER
-
 
 router = APIRouter(tags=["System"])
 
@@ -33,23 +33,37 @@ def healthz():
     return {"status": "ok"}
 
 
+@router.get("/version")
+def version():
+    return {"version": GATEWAY_VERSION, "status": "running"}
+
+
 @router.get("/readyz")
 async def readyz():
     results = {}
-    async with httpx.AsyncClient(timeout=5) as client:
-        for model_id, cfg in MODELS.items():
-            try:
-                r = await client.get(cfg["base_url"].rstrip("/") + "/models")
-                results[model_id] = {
-                    "reachable": r.status_code == 200,
-                    "status_code": r.status_code,
-                }
-            except Exception as exc:
-                results[model_id] = {
-                    "reachable": False,
-                    "error": type(exc).__name__,
-                }
-    return {"status": "ready", "backends": results}
+    current_models = load_models()
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            for model_id, cfg in current_models.items():
+                try:
+                    r = await client.get(cfg["base_url"].rstrip("/") + "/models")
+                    results[model_id] = {
+                        "reachable": r.status_code == 200,
+                        "status_code": r.status_code,
+                    }
+                except Exception as exc:
+                    results[model_id] = {
+                        "reachable": False,
+                        "error": type(exc).__name__,
+                    }
+    except Exception as exc:
+        return {"status": "degraded", "error": str(exc), "backends": results}
+
+    all_ready = any(b.get("reachable") for b in results.values()) if results else True
+    return {
+        "status": "ready" if all_ready else "waiting_upstream",
+        "backends": results,
+    }
 
 
 @router.get("/metrics")
@@ -73,4 +87,3 @@ def dashboard():
             },
         )
     return DASHBOARD_FALLBACK_HTML
-

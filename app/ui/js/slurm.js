@@ -4,7 +4,9 @@
 
 async function fetchSlurmNodes() {
     try {
-        const res = await fetch(`${GATEWAY_BASE}/api/slurm/nodes`);
+        const res = await fetch(`${GATEWAY_BASE}/api/slurm/nodes`, {
+            headers: getAdminHeaders()
+        });
         if (!res.ok) return;
         const data = await res.json();
         const tbody = document.getElementById('slurm-nodes-table-body');
@@ -100,117 +102,390 @@ async function fetchSlurmNodes() {
     }
 }
 
-async function fetchSlurmJobs() {
+let slurmQueueMode = 'all-queue'; // 'all-queue' (GPU Queue squeue) or 'my-jobs' (User Serving Jobs)
+let slurmCurrentPartition = 'gpu-queue';
+let cachedQueueData = [];
+let cachedMyJobsData = [];
+
+function setSlurmQueueMode(mode) {
+    slurmQueueMode = mode;
+    const tabAll = document.getElementById('queue-tab-all');
+    const tabMine = document.getElementById('queue-tab-mine');
+
+    const labelScope = document.getElementById('queue-stat-label-scope');
+    const labelTotal = document.getElementById('queue-stat-label-total');
+    const labelRunning = document.getElementById('queue-stat-label-running');
+    const labelPending = document.getElementById('queue-stat-label-pending');
+    const statScope = document.getElementById('queue-stat-partition');
+    const statTotal = document.getElementById('queue-stat-total');
+    const statRunning = document.getElementById('queue-stat-running');
+    const statPending = document.getElementById('queue-stat-pending');
+
+    if (mode === 'all-queue') {
+        if (tabAll) tabAll.className = 'px-3.5 py-1.5 rounded-lg bg-neon-500 text-slate-950 font-black transition-all flex items-center gap-1.5 shadow-glow-neon-sm';
+        if (tabMine) tabMine.className = 'px-3.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-1.5';
+
+        if (labelScope) labelScope.innerText = 'Partition:';
+        if (labelTotal) labelTotal.innerText = 'Total Jobs:';
+        if (labelRunning) labelRunning.innerText = 'Running (R):';
+        if (labelPending) labelPending.innerText = 'Pending (PD):';
+        if (statScope) statScope.innerText = slurmCurrentPartition;
+        if (statTotal) statTotal.innerText = cachedQueueData.length;
+        if (statRunning) statRunning.innerText = cachedQueueData.filter(j => j.status === 'R').length;
+        if (statPending) statPending.innerText = cachedQueueData.filter(j => j.status === 'PD').length;
+    } else {
+        if (tabAll) tabAll.className = 'px-3.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-1.5';
+        if (tabMine) tabMine.className = 'px-3.5 py-1.5 rounded-lg bg-neon-500 text-slate-950 font-black transition-all flex items-center gap-1.5 shadow-glow-neon-sm';
+
+        if (labelScope) labelScope.innerText = 'User Account:';
+        if (labelTotal) labelTotal.innerText = 'Serving Jobs:';
+        if (labelRunning) labelRunning.innerText = 'Running (R):';
+        if (labelPending) labelPending.innerText = 'Pending (PD):';
+        if (statScope) statScope.innerText = 'ducledinh';
+        if (statTotal) statTotal.innerText = cachedMyJobsData.length;
+        if (statRunning) statRunning.innerText = cachedMyJobsData.filter(j => (j.status || '').toUpperCase() === 'RUNNING').length;
+        if (statPending) statPending.innerText = cachedMyJobsData.filter(j => (j.status || '').toUpperCase() === 'PENDING').length;
+    }
+
+    refreshSlurmQueueView();
+}
+
+function onSlurmPartitionChange(val) {
+    slurmCurrentPartition = val;
+    refreshSlurmQueueView();
+}
+
+async function refreshSlurmQueueView() {
+    if (slurmQueueMode === 'all-queue') {
+        await fetchSlurmQueue();
+    } else {
+        await fetchSlurmJobs();
+    }
+}
+
+async function fetchSlurmQueue() {
     try {
-        const res = await fetch(`${GATEWAY_BASE}/api/slurm/jobs`);
+        const partition = slurmCurrentPartition || 'gpu-queue';
+        const res = await fetch(`${GATEWAY_BASE}/api/slurm/queue?partition=${encodeURIComponent(partition)}`, {
+            headers: getAdminHeaders()
+        });
         if (!res.ok) return;
         const data = await res.json();
-        const tbody = document.getElementById('slurm-jobs-table-body');
-        const jobs = data.jobs || [];
+        cachedQueueData = data.jobs || [];
 
-        // Update Active Jobs Top KPI
+        const totalBadge = document.getElementById('queue-total-badge');
+        if (totalBadge) totalBadge.innerText = data.total ?? cachedQueueData.length;
+
+        // Update stats bar if in all-queue mode
+        if (slurmQueueMode === 'all-queue') {
+            const statPart = document.getElementById('queue-stat-partition');
+            const statTotal = document.getElementById('queue-stat-total');
+            const statRunning = document.getElementById('queue-stat-running');
+            const statPending = document.getElementById('queue-stat-pending');
+
+            if (statPart) statPart.innerText = data.partition || partition;
+            if (statTotal) statTotal.innerText = data.total ?? cachedQueueData.length;
+            if (statRunning) statRunning.innerText = data.running ?? 0;
+            if (statPending) statPending.innerText = data.pending ?? 0;
+        }
+
+        // Top KPI sync
         const activeCount = document.getElementById('slurm-active-count');
         const activeBadge = document.getElementById('slurm-active-node-badge');
-
-        const runningJobs = jobs.filter(j => j.status.toUpperCase() === 'RUNNING');
-        if (activeCount) activeCount.innerText = runningJobs.length;
-
+        if (activeCount) activeCount.innerText = data.running ?? 0;
         if (activeBadge) {
-            if (runningJobs.length > 0) {
-                const nodesList = [...new Set(runningJobs.map(j => j.node).filter(Boolean))].join(', ');
-                activeBadge.innerText = `Node: ${nodesList || 'Active'}`;
-            } else if (jobs.length > 0) {
-                activeBadge.innerText = `Queued: #${jobs[0].job_id}`;
+            const runningNodes = [...new Set(cachedQueueData.filter(j => j.status === 'R').map(j => j.reason || j.node).filter(n => n && !n.startsWith('(')))];
+            if (runningNodes.length > 0) {
+                activeBadge.innerText = `Nodes: ${runningNodes.join(', ')}`;
+            } else if (cachedQueueData.length > 0) {
+                activeBadge.innerText = `Queued: ${cachedQueueData.length} jobs`;
             } else {
-                activeBadge.innerText = 'Node: --';
+                activeBadge.innerText = 'Nodes: Idle';
             }
         }
 
-        if (!tbody) return;
-
-        if (jobs.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="8" class="text-center py-6 text-slate-400 font-medium">
-                        No active jobs running in Slurm partition.
-                    </td>
-                </tr>
-            `;
-            return;
+        if (slurmQueueMode === 'all-queue') {
+            renderSlurmCurrentQueue();
         }
+    } catch (err) {
+        console.debug('Failed to fetch slurm queue:', err);
+    }
+}
 
-        tbody.innerHTML = jobs.map(j => {
-            let statusBadge = 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
-            const st = j.status.toUpperCase();
-            if (st === 'RUNNING') {
-                statusBadge = 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 animate-pulse';
-            } else if (st === 'PENDING') {
-                statusBadge = 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40';
-            } else if (st === 'CANCELLED' || st === 'FAILED') {
-                statusBadge = 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40';
+async function fetchSlurmJobs() {
+    try {
+        // Fetch queue in background too to keep badge updated
+        fetchSlurmQueue().catch(() => {});
+
+        const res = await fetch(`${GATEWAY_BASE}/api/slurm/jobs`, {
+            headers: getAdminHeaders()
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const jobs = data.jobs || [];
+        cachedMyJobsData = jobs;
+
+        const mineBadge = document.getElementById('queue-mine-badge');
+        if (mineBadge) mineBadge.innerText = jobs.length;
+
+        const runningJobs = jobs.filter(j => (j.status || '').toUpperCase() === 'RUNNING');
+
+        if (slurmQueueMode === 'my-jobs') {
+            const statTotal = document.getElementById('queue-stat-total');
+            const statRunning = document.getElementById('queue-stat-running');
+            const statPending = document.getElementById('queue-stat-pending');
+            const statScope = document.getElementById('queue-stat-partition');
+
+            if (statScope) statScope.innerText = 'ducledinh';
+            if (statTotal) statTotal.innerText = jobs.length;
+            if (statRunning) statRunning.innerText = runningJobs.length;
+            if (statPending) statPending.innerText = jobs.filter(j => (j.status || '').toUpperCase() === 'PENDING').length;
+
+            const activeCount = document.getElementById('slurm-active-count');
+            const activeBadge = document.getElementById('slurm-active-node-badge');
+            if (activeCount) activeCount.innerText = runningJobs.length;
+            if (activeBadge) {
+                if (runningJobs.length > 0) {
+                    const nodesList = [...new Set(runningJobs.map(j => j.node).filter(Boolean))].join(', ');
+                    activeBadge.innerText = `Node: ${nodesList || 'Active'}`;
+                } else if (jobs.length > 0) {
+                    activeBadge.innerText = `Queued: #${jobs[0].job_id}`;
+                } else {
+                    activeBadge.innerText = 'Node: --';
+                }
             }
-
-            return `
-                <tr class="hover:bg-slate-50/50 dark:hover:bg-[#111827]/40 transition-colors border-b border-slate-100 dark:border-slate-800/60 font-mono text-[11px]">
-                    <td class="px-4 py-2.5 font-bold text-slate-900 dark:text-slate-100">#${j.job_id}</td>
-                    <td class="px-4 py-2.5 text-slate-700 dark:text-slate-200 font-semibold">${j.name}</td>
-                    <td class="px-4 py-2.5 text-slate-500">${j.partition}</td>
-                    <td class="px-4 py-2.5 text-neon-600 dark:text-neon-400 font-semibold">${j.node}</td>
-                    <td class="px-4 py-2.5 text-slate-500">${j.gres || '-'}</td>
-                    <td class="px-4 py-2.5 text-slate-600 dark:text-slate-300">${j.time}</td>
-                    <td class="px-4 py-2.5">
-                        <span class="px-2 py-0.5 rounded-md font-semibold text-[10px] ${statusBadge}">
-                            ${j.status}
-                        </span>
-                    </td>
-                    <td class="px-4 py-2.5 text-right space-x-1.5">
-                        <button onclick="inspectSlurmJobLog('${j.job_id}')"
-                            class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold transition-all"
-                            title="Inspect Log Output">
-                            Logs
-                        </button>
-                        <button onclick="cancelSlurmJob('${j.job_id}')"
-                            class="px-2 py-1 rounded bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800/40 transition-all"
-                            title="Cancel Job">
-                            Cancel
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+            renderSlurmCurrentQueue();
+        }
     } catch (err) {
         console.debug('Failed to fetch slurm jobs:', err);
     }
 }
 
+function renderSlurmCurrentQueue() {
+    const tbody = document.getElementById('slurm-jobs-table-body');
+    if (!tbody) return;
+
+    const filterStatus = (document.getElementById('slurm-queue-status-filter')?.value || 'all').toUpperCase();
+    const isAllQueue = (slurmQueueMode === 'all-queue');
+    const rawList = isAllQueue ? cachedQueueData : cachedMyJobsData;
+
+    let filtered = rawList;
+    if (filterStatus !== 'ALL') {
+        filtered = rawList.filter(j => {
+            const st = (j.status || '').toUpperCase();
+            if (filterStatus === 'R') return st === 'R' || st === 'RUNNING';
+            if (filterStatus === 'PD') return st === 'PD' || st === 'PENDING';
+            return st === filterStatus;
+        });
+    }
+
+    if (filtered.length === 0) {
+        if (isAllQueue) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center py-12 text-slate-400">
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/60 text-slate-400">
+                                <i data-lucide="layers" class="w-6 h-6 stroke-1"></i>
+                            </div>
+                            <span class="text-xs font-bold text-slate-700 dark:text-slate-300">No active jobs found in Slurm partition ${slurmCurrentPartition}.</span>
+                            <span class="text-[11px] text-slate-500">All compute nodes are currently idle or jobs matching the filter have finished.</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center py-12 text-slate-400">
+                        <div class="flex flex-col items-center gap-2.5">
+                            <div class="p-3 rounded-2xl bg-neon-500/10 text-neon-400 border border-neon-500/20 shadow-glow-neon-sm">
+                                <i data-lucide="cpu" class="w-6 h-6"></i>
+                            </div>
+                            <div class="space-y-0.5">
+                                <span class="text-xs font-bold text-slate-900 dark:text-white block">No Active Serving Jobs for ducledinh</span>
+                                <span class="text-[11px] text-slate-500 block">You currently have no active LLM serving processes running in Slurm.</span>
+                            </div>
+                            <div class="flex items-center gap-2 pt-1.5">
+                                <button onclick="openSubmitJobModal()" class="px-3.5 py-1.5 rounded-xl bg-neon-500 hover:bg-neon-400 text-slate-950 font-black text-xs uppercase flex items-center gap-1.5 shadow-glow-neon-sm transition-all">
+                                    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                                    <span>Launch Serving Job</span>
+                                </button>
+                                <button onclick="setSlurmQueueMode('all-queue')" class="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111827] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all">
+                                    <span>View All Cluster Jobs</span>
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        if (window.lucide) lucide.createIcons();
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(j => {
+        const rawSt = (j.status || '').toUpperCase();
+        let stateBadge = 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+        let stateLabel = rawSt;
+
+        if (rawSt === 'R' || rawSt === 'RUNNING') {
+            stateBadge = 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700/60';
+            stateLabel = 'RUNNING (R)';
+        } else if (rawSt === 'PD' || rawSt === 'PENDING') {
+            stateBadge = 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700/60';
+            stateLabel = 'PENDING (PD)';
+        } else if (rawSt === 'CG' || rawSt === 'COMPLETING') {
+            stateBadge = 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-700/60';
+            stateLabel = 'COMPLETING';
+        } else if (rawSt === 'CD' || rawSt === 'COMPLETED') {
+            stateBadge = 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-300 dark:border-slate-700';
+            stateLabel = 'COMPLETED';
+        } else if (rawSt === 'CA' || rawSt === 'CANCELLED' || rawSt === 'F' || rawSt === 'FAILED') {
+            stateBadge = 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-300 dark:border-rose-700/60';
+            stateLabel = 'FAILED/CANCEL';
+        }
+
+        const username = j.user || 'ducledinh';
+        const isMe = (username.toLowerCase().includes('ducledin') || username.toLowerCase() === 'user');
+        const userBadge = isMe
+            ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] bg-neon-500/15 text-neon-400 border border-neon-500/30">
+                 <span class="w-1.5 h-1.5 rounded-full bg-neon-500 animate-pulse"></span>${username} (You)
+               </span>`
+            : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium text-[10px] bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">
+                 ${username}
+               </span>`;
+
+        // Node / Reason
+        const reasonText = j.reason || j.node || '-';
+        const isReason = reasonText.startsWith('(') || reasonText.includes('Limit') || reasonText.includes('Priority') || reasonText.includes('Resources');
+        const nodeDisplay = isReason
+            ? `<span class="text-amber-500 dark:text-amber-400 text-[10px] font-mono">${reasonText}</span>`
+            : `<span class="text-slate-700 dark:text-neon-400 font-bold flex items-center gap-1">
+                 <i data-lucide="server" class="w-3 h-3 text-neon-500"></i>${reasonText}
+               </span>`;
+
+        // Clean Job ID (without array suffixes for log inspection)
+        const cleanJobId = (j.job_id || '').split('_')[0];
+
+        return `
+            <tr class="hover:bg-slate-50/50 dark:hover:bg-[#111827]/40 transition-colors border-b border-slate-100 dark:border-slate-800/60 font-mono text-[11px]">
+                <td class="px-3 py-2.5 font-bold text-slate-900 dark:text-slate-100">#${j.job_id}</td>
+                <td class="px-3 py-2.5 text-slate-500">${j.partition || '-'}</td>
+                <td class="px-3 py-2.5 text-slate-700 dark:text-slate-200 font-semibold truncate max-w-[140px]" title="${j.name}">${j.name || '-'}</td>
+                <td class="px-3 py-2.5">${userBadge}</td>
+                <td class="px-3 py-2.5">
+                    <span class="px-2 py-0.5 rounded-md font-bold text-[9px] ${stateBadge}">
+                        ${stateLabel}
+                    </span>
+                </td>
+                <td class="px-3 py-2.5 text-slate-600 dark:text-slate-300">${j.time || '0:00'}</td>
+                <td class="px-3 py-2.5 text-slate-500">${j.nodes || '1'}</td>
+                <td class="px-3 py-2.5">${nodeDisplay}</td>
+                <td class="px-3 py-2.5 text-right space-x-1.5 whitespace-nowrap">
+                    <button onclick="inspectSlurmJobLog('${cleanJobId}')"
+                        class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-[10px] transition-all"
+                        title="View job log output">
+                        Logs
+                    </button>
+                    ${isMe ? `
+                    <button onclick="cancelSlurmJob('${cleanJobId}')"
+                        class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 font-bold text-[10px] border border-rose-200 dark:border-rose-800/40 transition-all"
+                        title="Cancel job (scancel)">
+                        Cancel
+                    </button>
+                    ` : ''}
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+}
+
 async function fetchTunnelTelemetry() {
     try {
-        const res = await fetch(`${GATEWAY_BASE}/api/slurm/tunnel`);
+        const res = await fetch(`${GATEWAY_BASE}/api/slurm/tunnel`, {
+            headers: getAdminHeaders()
+        });
         if (!res.ok) return;
         const data = await res.json();
 
         const badge = document.getElementById('tunnel-status-badge');
         const info = document.getElementById('tunnel-status-info');
+        const targetNodeEl = document.getElementById('tunnel-target-node');
+        const upstreamBadge = document.getElementById('tunnel-upstream-badge');
+        const latencyBadge = document.getElementById('tunnel-latency-badge');
 
         if (badge) {
             if (data.alive) {
-                badge.className = 'px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex items-center gap-1.5 animate-pulse';
-                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> ACTIVE`;
+                if (data.upstream_healthy) {
+                    badge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] flex items-center gap-1.5 animate-pulse';
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> ONLINE & SERVING`;
+                } else {
+                    badge.className = 'px-2.5 py-0.5 rounded-full bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-300 dark:border-cyan-700/60 text-cyan-700 dark:text-cyan-300 font-bold text-[10px] flex items-center gap-1.5';
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-cyan-400"></span> TUNNEL UP (WARMING UP)`;
+                }
             } else {
-                badge.className = 'px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 font-bold text-xs flex items-center gap-1.5';
+                badge.className = 'px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 font-bold text-[10px] flex items-center gap-1.5';
                 badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span> DISCONNECTED`;
             }
         }
 
         if (info) {
-            if (data.alive) {
-                info.innerText = `127.0.0.1:${data.local_port} -> ${data.target_node}:${data.remote_port} (${data.uptime_seconds}s)`;
+            info.innerText = data.route || (data.alive ? `127.0.0.1:${data.local_port} -> ${data.target_node}:${data.remote_port}` : '127.0.0.1:18000 -> Standby');
+        }
+
+        if (targetNodeEl) {
+            targetNodeEl.innerText = data.target_node ? `${data.target_node} (Job #${data.job_id || '--'})` : 'Auto-negotiated via Slurm';
+        }
+
+        if (upstreamBadge) {
+            if (data.upstream_healthy) {
+                upstreamBadge.className = 'font-bold text-emerald-600 dark:text-emerald-400';
+                upstreamBadge.innerText = 'HTTP 200 OK';
+            } else if (data.alive) {
+                upstreamBadge.className = 'font-bold text-amber-500';
+                upstreamBadge.innerText = data.upstream_status || 'Waiting for Model';
             } else {
-                info.innerText = data.last_error ? `Error: ${data.last_error}` : 'Waiting for active Slurm job...';
+                upstreamBadge.className = 'font-bold text-slate-500';
+                upstreamBadge.innerText = 'Offline';
             }
+        }
+
+        if (latencyBadge) {
+            latencyBadge.innerText = data.upstream_latency_ms ? `(${data.upstream_latency_ms}ms RTT)` : (data.alive ? `(${data.uptime_seconds}s uptime)` : '--');
         }
     } catch (err) {
         console.debug('Failed to fetch tunnel telemetry:', err);
+    }
+}
+
+async function restartTunnelAction() {
+    try {
+        showToast('Cycling and reconnecting SSH tunnel...', 'info');
+        const res = await fetch(`${GATEWAY_BASE}/api/slurm/tunnel/restart`, {
+            method: 'POST',
+            headers: getAdminHeaders()
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'running') {
+            showToast('SSH tunnel reconnected successfully!', 'success');
+        } else {
+            showToast(data.tunnel?.last_error || 'SSH tunnel reset to standby.', 'info');
+        }
+        await fetchTunnelTelemetry();
+    } catch (err) {
+        showToast(`Failed to reconnect tunnel: ${err.message || err}`, 'error');
+    }
+}
+
+async function probeTunnelHealthAction() {
+    try {
+        await fetchTunnelTelemetry();
+        showToast('Tunnel health telemetry refreshed.', 'success');
+    } catch (err) {
+        showToast(`Probe failed: ${err.message || err}`, 'error');
     }
 }
 
@@ -242,6 +517,10 @@ function updateSlurmScriptPreview() {
 }
 
 function openSubmitJobModal() {
+    if (typeof isAdmin === 'function' && !isAdmin()) {
+        showToast('Administrator privileges required to submit Slurm jobs', 'warning');
+        return;
+    }
     const modal = document.getElementById('modal-submit-job');
     if (modal) {
         modal.classList.remove('hidden');
@@ -255,6 +534,11 @@ function closeSubmitJobModal() {
 }
 
 async function submitSlurmJobAction() {
+    if (typeof isAdmin === 'function' && !isAdmin()) {
+        showToast('Administrator privileges required to submit Slurm jobs', 'warning');
+        return;
+    }
+
     const submitBtn = document.querySelector('#modal-submit-job button[onclick="submitSlurmJobAction()"]');
     const originalText = submitBtn ? submitBtn.innerHTML : 'Submit Job';
     const model = document.getElementById('submit-job-model').value;
@@ -278,10 +562,10 @@ async function submitSlurmJobAction() {
         if (res.ok) {
             showToast(data.message || `Submitted sbatch job ID #${data.job_id}`, 'success');
             closeSubmitJobModal();
-            fetchSlurmJobs();
+            refreshSlurmQueueView();
             fetchSlurmNodes();
         } else if (res.status === 401 || res.status === 403) {
-            showToast('Admin session expired. Please sign in again.', 'error');
+            showToast('Admin session expired or access denied.', 'error');
         } else {
             showToast(data.detail || `Failed to submit sbatch job (HTTP ${res.status})`, 'error');
         }
@@ -296,6 +580,11 @@ async function submitSlurmJobAction() {
 }
 
 async function cancelSlurmJob(jobId) {
+    if (typeof isAdmin === 'function' && !isAdmin()) {
+        showToast('Administrator privileges required to cancel Slurm jobs', 'warning');
+        return;
+    }
+
     if (!confirm(`Are you sure you want to cancel Slurm job #${jobId}? (scancel ${jobId})`)) {
         return;
     }
@@ -307,7 +596,7 @@ async function cancelSlurmJob(jobId) {
         const data = await res.json();
         if (res.ok) {
             showToast(data.message || `Cancelled Slurm job #${jobId}`, 'info');
-            fetchSlurmJobs();
+            refreshSlurmQueueView();
             fetchSlurmNodes();
         } else {
             showToast(data.detail || 'Failed to cancel job', 'error');
@@ -429,7 +718,9 @@ async function refreshSlurmLogs() {
     if (!logContent) return;
 
     if (!selectedSlurmJobId) {
-        const jobsRes = await fetch(`${GATEWAY_BASE}/api/slurm/jobs`);
+        const jobsRes = await fetch(`${GATEWAY_BASE}/api/slurm/jobs`, {
+            headers: getAdminHeaders()
+        });
         const jobsData = await jobsRes.json().catch(() => ({}));
         selectedSlurmJobId = jobsData.jobs?.[0]?.job_id || null;
     }
@@ -439,7 +730,9 @@ async function refreshSlurmLogs() {
     }
 
     try {
-        const res = await fetch(`${GATEWAY_BASE}/api/slurm/logs/${selectedSlurmJobId}`);
+        const res = await fetch(`${GATEWAY_BASE}/api/slurm/logs/${selectedSlurmJobId}`, {
+            headers: getAdminHeaders()
+        });
         const data = await res.json();
         const stdout = data.stdout || data.log || '';
         const stderr = data.stderr || '';

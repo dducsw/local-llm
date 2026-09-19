@@ -211,10 +211,35 @@ async function executeInference() {
     const outputEl = document.getElementById('play-output');
     const runBtn = document.getElementById('send-infer-btn');
     const stopBtn = document.getElementById('abort-infer-btn');
+    const statusPill = document.getElementById('play-status-pill');
 
-    if (outputEl) outputEl.textContent = '';
+    if (outputEl) {
+        outputEl.textContent = 'Connecting to model and running benchmark...';
+    }
     if (runBtn) runBtn.classList.add('hidden');
     if (stopBtn) stopBtn.classList.remove('hidden');
+    if (statusPill) {
+        statusPill.innerText = 'Running...';
+        statusPill.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/30 animate-pulse';
+    }
+
+    // Reset Benchmark HUD meters
+    const hudSpeed = document.getElementById('hud-speed');
+    const hudTime = document.getElementById('hud-time');
+    const hudToks = document.getElementById('hud-tokens');
+    const hudTtft = document.getElementById('hud-ttft');
+    const hudVram = document.getElementById('hud-vram');
+
+    if (hudSpeed) hudSpeed.innerText = '... tok/s';
+    if (hudTime) hudTime.innerText = '0.0s';
+    if (hudToks) hudToks.innerText = '0';
+    if (hudTtft) hudTtft.innerText = '... ms';
+
+    // Populate initial VRAM from dashboard
+    const curVramUsage = document.getElementById('metric-vram-usage')?.innerText || '0.0';
+    const curVramTotal = document.getElementById('metric-vram-total')?.innerText || '32.0';
+    const curVramPct = document.getElementById('metric-vram-pct')?.innerText || '0%';
+    if (hudVram) hudVram.innerText = `${curVramUsage} / ${curVramTotal} GB (${curVramPct})`;
 
     const startTime = performance.now();
     let firstTokenTime = null;
@@ -249,73 +274,148 @@ async function executeInference() {
 
         if (!res.ok) {
             const errData = await res.json().catch(() => ({ error: { message: 'HTTP Error ' + res.status } }));
-            throw new Error(errData.detail?.error?.message || errData.error?.message || 'Inference error');
+            throw new Error(errData.detail?.error?.message || errData.error?.message || `HTTP Error ${res.status}`);
         }
 
         const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
+        const isJson = contentType.includes('application/json');
+
+        if (isJson) {
             const data = await res.json();
             const msg = data.choices?.[0]?.message || {};
             responseText = msg.content || msg.reasoning_content || '';
+            generatedTokenCount = data.usage?.completion_tokens || Math.max(1, Math.round(responseText.length / 4));
+            firstTokenTime = performance.now();
             if (outputEl) outputEl.textContent = responseText;
-            generatedTokenCount = data.usage?.completion_tokens || 10;
-            const hudToks = document.getElementById('hud-tokens');
-            if (hudToks) hudToks.innerText = generatedTokenCount;
-            return;
+        } else {
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+            let isFirstChunk = true;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                if (!firstTokenTime) {
+                    firstTokenTime = performance.now();
+                    const ttft = (firstTokenTime - startTime).toFixed(0);
+                    const metricTtft = document.getElementById('metric-ttft');
+                    if (hudTtft) hudTtft.innerText = `${ttft} ms`;
+                    if (metricTtft) metricTtft.innerText = `${ttft} ms`;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed || !trimmed.startsWith('data:')) continue;
+                    const dataStr = trimmed.substring(5).trim();
+                    if (dataStr === '[DONE]') continue;
+
+                    try {
+                        const parsed = JSON.parse(dataStr);
+                        if (parsed.usage?.completion_tokens) {
+                            generatedTokenCount = parsed.usage.completion_tokens;
+                        }
+                        const delta = parsed.choices?.[0]?.delta;
+                        const chunk = delta?.content || delta?.reasoning_content || '';
+                        if (chunk) {
+                            if (isFirstChunk) {
+                                responseText = '';
+                                isFirstChunk = false;
+                            }
+                            responseText += chunk;
+                            if (outputEl) {
+                                outputEl.textContent = responseText;
+                                outputEl.scrollTop = outputEl.scrollHeight;
+                            }
+                            if (!parsed.usage?.completion_tokens) {
+                                generatedTokenCount++;
+                            }
+                            if (hudToks) hudToks.innerText = generatedTokenCount;
+
+                            // Live throughput computation
+                            const elapsedSeconds = (performance.now() - startTime) / 1000;
+                            if (elapsedSeconds > 0.05) {
+                                const liveSpeed = (generatedTokenCount / elapsedSeconds).toFixed(1);
+                                if (hudSpeed) hudSpeed.innerText = `${liveSpeed} tok/s`;
+                                if (hudTime) hudTime.innerText = `${elapsedSeconds.toFixed(1)}s`;
+                            }
+                        }
+                    } catch (err) { }
+                }
+            }
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            if (!firstTokenTime) {
-                firstTokenTime = performance.now();
-                const ttft = (firstTokenTime - startTime).toFixed(0);
-                const hudTtft = document.getElementById('hud-ttft');
-                const metricTtft = document.getElementById('metric-ttft');
-                if (hudTtft) hudTtft.innerText = `${ttft}ms`;
-                if (metricTtft) metricTtft.innerText = `${ttft} ms`;
-            }
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop();
-
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed || !trimmed.startsWith('data:')) continue;
-                const dataStr = trimmed.substring(5).trim();
-                if (dataStr === '[DONE]') continue;
-
-                try {
-                    const parsed = JSON.parse(dataStr);
-                    const delta = parsed.choices?.[0]?.delta;
-                    const chunk = delta?.content || delta?.reasoning_content || '';
-                    if (chunk) {
-                        responseText += chunk;
-                        if (outputEl) {
-                            outputEl.textContent = responseText;
-                            outputEl.scrollTop = outputEl.scrollHeight;
-                        }
-                        generatedTokenCount++;
-                        const hudToks = document.getElementById('hud-tokens');
-                        if (hudToks) hudToks.innerText = generatedTokenCount;
-                    }
-                } catch (err) { }
-            }
+        // Fallback token calculation if exact usage was omitted
+        if (generatedTokenCount === 0 && responseText) {
+            generatedTokenCount = Math.max(1, Math.round(responseText.length / 4));
         }
 
         const totalElapsed = (performance.now() - startTime) / 1000;
-        const tokPerSec = (generatedTokenCount / totalElapsed).toFixed(1);
+        const tokPerSec = (generatedTokenCount / Math.max(0.01, totalElapsed)).toFixed(1);
+        const ttftVal = firstTokenTime ? (firstTokenTime - startTime).toFixed(0) : Math.round(totalElapsed * 1000);
 
-        const hudTime = document.getElementById('hud-time');
+        // Update Benchmark HUD meters with vibrant results
         const metricSpeed = document.getElementById('metric-speed');
+        const metricTtft = document.getElementById('metric-ttft');
+        if (hudSpeed) hudSpeed.innerText = `${tokPerSec} tok/s`;
         if (hudTime) hudTime.innerText = `${totalElapsed.toFixed(2)}s`;
+        if (hudTtft) hudTtft.innerText = `${ttftVal} ms`;
+        if (hudToks) hudToks.innerText = generatedTokenCount;
         if (metricSpeed) metricSpeed.innerText = tokPerSec;
+        if (metricTtft) metricTtft.innerText = `${ttftVal} ms`;
+
+        // Update status pill to completed
+        if (statusPill) {
+            statusPill.innerText = `✓ ${tokPerSec} tok/s (${totalElapsed.toFixed(1)}s)`;
+            statusPill.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-neon-500/15 text-neon-500 border border-neon-500/40';
+        }
+
+        // Read and update VRAM pill
+        let vramStr = hudVram?.innerText || '-- GB';
+        const vramUsageEl = document.getElementById('metric-vram-usage');
+        const vramTotalEl = document.getElementById('metric-vram-total');
+        if (vramUsageEl && vramTotalEl && vramUsageEl.innerText !== '0.0' && vramUsageEl.innerText !== '--') {
+            const u = vramUsageEl.innerText;
+            const t = Math.round(parseFloat(vramTotalEl.innerText) || 32);
+            vramStr = `${u} / ${t} GB`;
+            if (hudVram) hudVram.innerText = vramStr;
+        }
+
+        // Fetch live VRAM from backend API to ensure 100% accurate reading
+        try {
+            fetch(`${GATEWAY_BASE}/api/metrics/realtime`)
+                .then(r => r.json())
+                .then(d => {
+                    if (d && d.vram_used_gb !== undefined && hudVram) {
+                        const u = typeof d.vram_used_gb === 'number' ? d.vram_used_gb.toFixed(1) : d.vram_used_gb;
+                        const t = Math.round(d.vram_total_gb || 32);
+                        hudVram.innerText = `${u} / ${t} GB`;
+                        hudVram.title = `VRAM: ${u} / ${d.vram_total_gb} GB (${d.vram_used_pct || 0}%)`;
+                    }
+                })
+                .catch(() => {});
+        } catch (e) {}
+
+        // Append high-visibility Benchmark summary block directly into the console
+        const summaryBlock = `\n\n══════════════════════════════════════════════════════════════
+⚡ BENCHMARK RESULT:
+• Model:        ${model}
+• Status:       200 OK (Completed)
+• Throughput:   ${tokPerSec} tok/s
+• Generated:    ${generatedTokenCount} tokens in ${totalElapsed.toFixed(2)}s
+• First Token:  ${ttftVal} ms (TTFT)
+• VRAM Usage:   ${vramStr}
+══════════════════════════════════════════════════════════════`;
+
+        if (outputEl) {
+            outputEl.textContent = (responseText || '[No response text received from model]') + summaryBlock;
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
 
         totalRequests++;
         totalTokens += generatedTokenCount;
@@ -323,6 +423,11 @@ async function executeInference() {
         const tokEl = document.getElementById('metric-total-tokens');
         if (reqEl) reqEl.innerText = totalRequests;
         if (tokEl) tokEl.innerText = totalTokens;
+
+        // Immediate post-inference real-time hardware telemetry refresh
+        if (typeof fetchRealtimeMetrics === 'function') {
+            fetchRealtimeMetrics().catch(() => {});
+        }
 
         addLedgerRecord({
             id: reqId,
@@ -334,14 +439,24 @@ async function executeInference() {
             time: new Date().toLocaleTimeString()
         });
 
-        showToast(`Inference completed: ${generatedTokenCount} tokens @ ${tokPerSec} tok/s`, 'success');
+        showToast(`Benchmark: ${generatedTokenCount} tokens @ ${tokPerSec} tok/s`, 'success');
 
     } catch (error) {
         if (error.name === 'AbortError') {
             if (outputEl) outputEl.textContent += '\n\n[Inference stopped by user]';
+            if (statusPill) {
+                statusPill.innerText = 'Stopped';
+                statusPill.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-500 border border-amber-500/30';
+            }
             showToast('Inference cancelled', 'info');
         } else {
-            if (outputEl) outputEl.textContent = `Error: ${error.message}`;
+            if (outputEl) {
+                outputEl.textContent = `[Inference Error] ${error.message}\n\nPlease check that the target model is running and Slurm compute worker is online.`;
+            }
+            if (statusPill) {
+                statusPill.innerText = '✗ Failed';
+                statusPill.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-500 border border-rose-500/30';
+            }
             showToast(`Error: ${error.message}`, 'error');
             addLedgerRecord({
                 id: reqId,
@@ -449,6 +564,10 @@ async function sendChatMessage() {
     if (!text) return;
 
     input.value = '';
+    if (typeof autoResizeTextarea === 'function') autoResizeTextarea(input);
+    const starters = document.getElementById('chat-prompt-starters');
+    if (starters) starters.classList.add('hidden');
+
     appendChatMessage('user', text);
     updateContextWindowMeter();
 
@@ -669,37 +788,78 @@ async function sendChatMessage() {
     }
 }
 
+function toggleChatParametersDrawer() {
+    const drawer = document.getElementById('chat-parameters-drawer');
+    if (drawer) {
+        drawer.classList.toggle('hidden');
+        if (window.lucide) lucide.createIcons();
+    }
+}
+
+function useStarterPrompt(text) {
+    const input = document.getElementById('chat-user-input');
+    if (input) {
+        input.value = text;
+        if (typeof autoResizeTextarea === 'function') autoResizeTextarea(input);
+        sendChatMessage();
+    }
+}
+
 function appendChatMessage(role, content) {
     const container = document.getElementById('chat-messages-container');
     if (!container) return null;
 
     const row = document.createElement('div');
-    row.className = 'flex items-start gap-3';
+    row.className = 'flex items-start gap-3.5';
 
     const isUser = role === 'user';
     const modelName = currentSelectedModel || document.getElementById('chat-model-select')?.value || 'AI Assistant';
     const avatar = isUser ? 'U' : modelName.slice(0, 2).toUpperCase();
-    const avatarBg = isUser ? 'bg-slate-700 text-white' : 'bg-gradient-to-tr from-neon-600 to-emerald-400 text-slate-950 font-black';
-    const bubbleBg = isUser ? 'bg-neon-50/80 dark:bg-neon-950/20 border border-neon-200 dark:border-neon-500/30' : 'bg-slate-100/80 dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800';
+    const avatarBg = isUser ? 'bg-slate-700 text-white' : 'bg-neon-500 text-slate-950 font-black shadow-glow-neon-sm';
+    const bubbleBg = isUser ? 'bg-neon-50/80 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30' : 'bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800';
 
     row.innerHTML = `
-        <div class="w-8 h-8 rounded-xl ${avatarBg} font-bold flex items-center justify-center text-[10px] flex-shrink-0 shadow-sm" title="${isUser ? 'You' : escapeHtml(modelName)}">
+        <div class="w-8 h-8 rounded-xl ${avatarBg} font-bold flex items-center justify-center text-[10px] flex-shrink-0 shadow-sm font-mono" title="${isUser ? 'You' : escapeHtml(modelName)}">
             ${avatar}
         </div>
-        <div class="p-4 rounded-2xl ${bubbleBg} text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-2xl w-full markdown-body">
-            ${!isUser ? `<div class="text-[10px] font-bold text-neon-700 dark:text-neon-400 font-mono mb-2">${escapeHtml(modelName)}</div>` : ''}
+        <div class="p-4 rounded-2xl ${bubbleBg} text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-3xl w-full shadow-sm markdown-body">
+            ${!isUser ? `<div class="text-[10px] font-bold text-neon-600 dark:text-neon-400 font-mono mb-2 flex items-center justify-between">
+                <span>${escapeHtml(modelName)}</span>
+                <button type="button" onclick="copyResponseText(this)" class="text-slate-400 hover:text-neon-400 font-sans flex items-center gap-1 text-[10px] transition-colors" title="Copy response">
+                    <i data-lucide="copy" class="w-3 h-3"></i>
+                    <span>Copy</span>
+                </button>
+            </div>` : ''}
             ${isUser ? `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>` : formatMarkdownText(content)}
         </div>
     `;
 
     container.appendChild(row);
     container.scrollTop = container.scrollHeight;
+    if (window.lucide) lucide.createIcons();
 
     if (isUser) {
         conversationHistory.push({ role: 'user', content: content });
     }
 
     return row.querySelector('.markdown-body');
+}
+
+function copyResponseText(btn) {
+    const bubble = btn.closest('.markdown-body');
+    if (!bubble) return;
+    const textToCopy = bubble.innerText.replace(/^[^\n]*\n/, '').trim(); // skip header
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="check" class="w-3 h-3 text-neon-500"></i><span class="text-neon-400 font-bold">Copied!</span>`;
+        if (window.lucide) lucide.createIcons();
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            if (window.lucide) lucide.createIcons();
+        }, 2000);
+    }).catch(() => {
+        showToast('Failed to copy text', 'error');
+    });
 }
 
 function stopChatStreaming() {
@@ -713,16 +873,58 @@ function clearChatHistory() {
     const container = document.getElementById('chat-messages-container');
     if (container) {
         container.innerHTML = `
-            <div class="flex items-start gap-3">
-                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-neon-600 to-emerald-400 text-slate-950 font-black flex items-center justify-center text-xs flex-shrink-0 shadow-sm dark:shadow-glow-neon-sm">
+            <div class="flex items-start gap-3.5">
+                <div id="chat-welcome-avatar" class="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-slate-950 font-black flex items-center justify-center text-xs flex-shrink-0 shadow-sm font-mono">
                     ${escapeHtml(modelName.slice(0, 2).toUpperCase())}
                 </div>
-                <div class="p-4 rounded-2xl bg-slate-100/80 dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-2xl w-full markdown-body">
-                    <div class="text-[10px] font-bold text-neon-700 dark:text-neon-400 font-mono mb-2">${escapeHtml(modelName)}</div>
-                    <p>Chat session cleared. How can I assist your AI engineering workload today?</p>
+                <div id="chat-welcome-bubble" class="p-4 rounded-2xl bg-white dark:bg-[#1e293b]/70 border border-slate-200/80 dark:border-slate-800/80 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-3xl w-full shadow-sm markdown-body">
+                    <div class="font-bold text-emerald-600 dark:text-emerald-400 mb-1 flex items-center gap-1.5">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                        <span>AI Local Serving Assistant</span>
+                    </div>
+                    <p>Chat session refreshed. Select a quick starter prompt below or enter a new query:</p>
                 </div>
             </div>
+
+            <div id="chat-prompt-starters" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-11 max-w-3xl">
+                <button type="button" onclick="useStarterPrompt('Benchmark inference performance and explain the latency & memory differences between FP16 and GGUF Q4_K_M on Tesla V100.')"
+                    class="prompt-starter-chip p-3 rounded-2xl bg-white dark:bg-[#1e293b]/50 border border-slate-200/90 dark:border-slate-800 text-left hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-all shadow-sm group">
+                    <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-xs mb-1">
+                        <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                        <span>Performance Benchmark</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">Compare FP16 vs GGUF Q4_K_M throughput on Tesla V100...</p>
+                </button>
+
+                <button type="button" onclick="useStarterPrompt('Write a Python script using the standard openai package to stream chat completions from gateway http://localhost:9001/v1.')"
+                    class="prompt-starter-chip p-3 rounded-2xl bg-white dark:bg-[#1e293b]/50 border border-slate-200/90 dark:border-slate-800 text-left hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-all shadow-sm group">
+                    <div class="flex items-center gap-2 text-teal-600 dark:text-teal-400 font-bold text-xs mb-1">
+                        <i data-lucide="code" class="w-3.5 h-3.5"></i>
+                        <span>Python Client Example</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">Connect and stream chat completions via OpenAI SDK...</p>
+                </button>
+
+                <button type="button" onclick="useStarterPrompt('Draft an optimized sbatch script to launch a vLLM serving engine for Qwen on our Slurm HPC cluster.')"
+                    class="prompt-starter-chip p-3 rounded-2xl bg-white dark:bg-[#1e293b]/50 border border-slate-200/90 dark:border-slate-800 text-left hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-all shadow-sm group">
+                    <div class="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-bold text-xs mb-1">
+                        <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                        <span>Slurm Sbatch Script</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">Production sbatch template for vLLM compute node serving...</p>
+                </button>
+
+                <button type="button" onclick="useStarterPrompt('Explain how PagedAttention in vLLM solves KV Cache memory fragmentation during continuous batching.')"
+                    class="prompt-starter-chip p-3 rounded-2xl bg-white dark:bg-[#1e293b]/50 border border-slate-200/90 dark:border-slate-800 text-left hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-all shadow-sm group">
+                    <div class="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs mb-1">
+                        <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+                        <span>PagedAttention Architecture</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">How virtual paging and contiguous blocks maximize VRAM...</p>
+                </button>
+            </div>
         `;
+        if (window.lucide) lucide.createIcons();
     }
     showToast('Chat history cleared', 'info');
 }

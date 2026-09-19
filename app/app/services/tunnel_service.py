@@ -161,8 +161,38 @@ class SSHTunnelManager:
         self.status = "STOPPED"
         self.connected_at = 0.0
 
+    def restart(self) -> bool:
+        """Cleanly cycle and re-establish the SSH tunnel."""
+        target = self.target_node
+        jid = self.job_id
+        lp = self.local_port
+        rp = self.remote_port
+        self.stop()
+        time.sleep(0.5)
+        return self.start(target_node=target, job_id=jid, local_port=lp, remote_port=rp)
+
+    def check_upstream_health(self) -> dict[str, Any]:
+        """Probes the local tunnel endpoint for upstream HTTP server responsiveness."""
+        if not self.is_alive():
+            return {"healthy": False, "status": "DISCONNECTED", "latency_ms": 0}
+
+        import urllib.request
+        start = time.time()
+        for endpoint in ("/health", "/v1/models", "/"):
+            try:
+                url = f"http://127.0.0.1:{self.local_port}{endpoint}"
+                req = urllib.request.Request(url, headers={"User-Agent": "GatewayTunnelHealthCheck"})
+                with urllib.request.urlopen(req, timeout=1.5) as resp:
+                    if resp.status in (200, 204):
+                        latency = int((time.time() - start) * 1000)
+                        return {"healthy": True, "status": "ONLINE", "latency_ms": latency}
+            except Exception:
+                continue
+        return {"healthy": False, "status": "WARMING_UP", "latency_ms": int((time.time() - start) * 1000)}
+
     def get_info(self) -> dict[str, Any]:
         alive = self.is_alive()
+        health = self.check_upstream_health() if alive else {"healthy": False, "status": "DISCONNECTED", "latency_ms": 0}
         return {
             "status": "RUNNING" if alive else self.status,
             "alive": alive,
@@ -173,6 +203,10 @@ class SSHTunnelManager:
             "connected_at": self.connected_at,
             "uptime_seconds": int(time.time() - self.connected_at) if (alive and self.connected_at > 0) else 0,
             "last_error": self.last_error,
+            "upstream_healthy": health["healthy"],
+            "upstream_status": health["status"],
+            "upstream_latency_ms": health["latency_ms"],
+            "route": f"127.0.0.1:{self.local_port} -> {HPC_SSH_HOST or 'headnode'}:{self.remote_port} -> {self.target_node or 'compute'}:8000",
         }
 
 

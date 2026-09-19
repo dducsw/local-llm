@@ -215,6 +215,11 @@ function switchTab(tabName) {
     const validTabs = ['telemetry', 'slurm', 'chatbot', 'keys', 'settings'];
     const activeName = tabName === 'playground' ? 'chatbot' : tabName;
 
+    if (activeName === 'slurm' && typeof isAdmin === 'function' && !isAdmin()) {
+        showToast('Slurm cluster access requires Administrator privileges', 'warning');
+        return;
+    }
+
     validTabs.forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (view) {
@@ -230,9 +235,9 @@ function switchTab(tabName) {
     document.querySelectorAll('[data-nav-tab]').forEach(btn => {
         const btnTab = btn.getAttribute('data-nav-tab');
         if (btnTab === activeName) {
-            btn.className = 'px-3.5 py-1.5 rounded-lg bg-white dark:bg-neon-500 text-neon-800 dark:text-slate-950 font-black shadow-sm dark:shadow-glow-neon-sm transition-all flex items-center gap-2 whitespace-nowrap shrink-0';
+            btn.className = 'px-3.5 py-1.5 rounded-xl bg-white dark:bg-neon-500 text-neon-800 dark:text-slate-950 font-black shadow-sm transition-all flex items-center gap-2 whitespace-nowrap shrink-0';
         } else {
-            btn.className = 'px-3.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2 whitespace-nowrap shrink-0';
+            btn.className = 'px-3.5 py-1.5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2 whitespace-nowrap shrink-0';
         }
     });
 
@@ -272,10 +277,26 @@ function refreshDashboardTelemetry() {
 }
 
 function manualRefreshDashboard() {
-    const activeBtn = document.querySelector('[data-nav-tab].bg-white, [data-nav-tab].dark\\:bg-neon-500');
+    const activeBtn = document.querySelector('[data-nav-tab].bg-white, [data-nav-tab].dark\\:bg-emerald-500, [data-nav-tab].dark\\:bg-neon-500');
     const currentTab = activeBtn ? activeBtn.getAttribute('data-nav-tab') : 'telemetry';
     switchTab(currentTab || 'telemetry');
     showToast('Data refreshed', 'info');
+}
+
+// Quick Demo Login Helper
+function quickFillLogin(user, pass) {
+    const userInput = document.getElementById('screen-login-user');
+    const passInput = document.getElementById('screen-login-pass');
+    if (userInput) userInput.value = user;
+    if (passInput) passInput.value = pass;
+    performScreenLogin();
+}
+
+// Auto-expand Textarea Helper
+function autoResizeTextarea(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 144) + 'px';
 }
 
 // Copy to Clipboard utility

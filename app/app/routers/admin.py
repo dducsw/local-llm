@@ -3,14 +3,15 @@ import secrets
 import time
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.config import load_models, RECENT_LOGS
+from app.config import load_models
+from app.state import RECENT_LOGS
 from app.database import db
 from app.schemas import CreateKeyRequest
-from app.services.auth_service import require_admin, sha256
-from app.services.slurm_service import run_slurm_cli
+from app.services.auth_service import require_admin, require_viewer_or_admin, sha256
+from app.services.slurm_service import run_slurm_cli_async
 from app.services.tunnel_service import TUNNEL_MANAGER
 
-router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)], tags=["Admin"])
+router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 @router.post("/keys")
@@ -24,7 +25,6 @@ def create_key(body: CreateKeyRequest, current_user: str = Depends(require_admin
     prefix = raw[:16]
     now = int(time.time())
 
-    # Calculate expiration timestamp based on duration
     durations = {
         "1d": 86400,
         "7d": 7 * 86400,
@@ -68,38 +68,22 @@ def create_key(body: CreateKeyRequest, current_user: str = Depends(require_admin
 
 
 @router.get("/keys")
-def list_keys(current_user: str = Depends(require_admin)):
+def list_keys(current_user: str = Depends(require_viewer_or_admin)):
     now = int(time.time())
     with db() as conn:
-        if current_user == "admin":
-            query = """
-                SELECT k.id, k.prefix, k.name, k.allowed_models, k.rpm,
-                       COALESCE(k.created_by, 'admin') as created_by,
-                       k.enabled, k.created_at,
-                       COALESCE(k.expires_at, 0) as expires_at,
-                       COUNT(l.id) as usage_requests,
-                       COALESCE(SUM(l.total_tokens), 0) as usage_tokens
-                FROM api_keys k
-                LEFT JOIN inference_logs l ON l.key_prefix = k.prefix
-                GROUP BY k.id
-                ORDER BY k.id DESC
-            """
-            rows = conn.execute(query).fetchall()
-        else:
-            query = """
-                SELECT k.id, k.prefix, k.name, k.allowed_models, k.rpm,
-                       COALESCE(k.created_by, 'admin') as created_by,
-                       k.enabled, k.created_at,
-                       COALESCE(k.expires_at, 0) as expires_at,
-                       COUNT(l.id) as usage_requests,
-                       COALESCE(SUM(l.total_tokens), 0) as usage_tokens
-                FROM api_keys k
-                LEFT JOIN inference_logs l ON l.key_prefix = k.prefix
-                WHERE COALESCE(k.created_by, 'admin') = ?
-                GROUP BY k.id
-                ORDER BY k.id DESC
-            """
-            rows = conn.execute(query, (current_user,)).fetchall()
+        query = """
+            SELECT k.id, k.prefix, k.name, k.allowed_models, k.rpm,
+                   COALESCE(k.created_by, 'admin') as created_by,
+                   k.enabled, k.created_at,
+                   COALESCE(k.expires_at, 0) as expires_at,
+                   COUNT(l.id) as usage_requests,
+                   COALESCE(SUM(l.total_tokens), 0) as usage_tokens
+            FROM api_keys k
+            LEFT JOIN inference_logs l ON l.key_prefix = k.prefix
+            GROUP BY k.id
+            ORDER BY k.id DESC
+        """
+        rows = conn.execute(query).fetchall()
 
     return {
         "data": [
@@ -131,8 +115,6 @@ def toggle_key(key_id: int, current_user: str = Depends(require_admin)):
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Key not found")
-        if current_user != "admin" and row["created_by"] != current_user:
-            raise HTTPException(status_code=403, detail="You do not have permission to modify this key")
         new_state = 0 if row["enabled"] else 1
         conn.execute("UPDATE api_keys SET enabled = ? WHERE id = ?", (new_state, key_id))
         conn.commit()
@@ -143,28 +125,26 @@ def toggle_key(key_id: int, current_user: str = Depends(require_admin)):
 def revoke_key(key_id: int, current_user: str = Depends(require_admin)):
     with db() as conn:
         row = conn.execute(
-            "SELECT COALESCE(created_by, 'admin') as created_by FROM api_keys WHERE id = ?",
+            "SELECT id FROM api_keys WHERE id = ?",
             (key_id,),
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Key not found")
-        if current_user != "admin" and row["created_by"] != current_user:
-            raise HTTPException(status_code=403, detail="You do not have permission to delete this key")
         conn.execute("DELETE FROM api_keys WHERE id = ?", (key_id,))
         conn.commit()
     return {"id": key_id, "deleted": True, "revoked": True}
 
 
 @router.get("/telemetry")
-def get_telemetry():
+def get_telemetry(current_user: str = Depends(require_viewer_or_admin)):
     with db() as conn:
         stats = conn.execute(
             """
             SELECT 
                 COUNT(*) as total_requests,
-                SUM(prompt_tokens) as total_prompt,
-                SUM(completion_tokens) as total_completion,
-                SUM(total_tokens) as total_tokens
+                COALESCE(SUM(prompt_tokens), 0) as total_prompt,
+                COALESCE(SUM(completion_tokens), 0) as total_completion,
+                COALESCE(SUM(total_tokens), 0) as total_tokens
             FROM inference_logs
             """
         ).fetchone()
@@ -205,10 +185,10 @@ def get_telemetry():
 
     return {
         "stats": {
-            "total_requests": stats["total_requests"] or 0,
-            "total_prompt": stats["total_prompt"] or 0,
-            "total_completion": stats["total_completion"] or 0,
-            "total_tokens": stats["total_tokens"] or 0,
+            "total_requests": stats["total_requests"] if stats else 0,
+            "total_prompt": stats["total_prompt"] if stats else 0,
+            "total_completion": stats["total_completion"] if stats else 0,
+            "total_tokens": stats["total_tokens"] if stats else 0,
         },
         "current_metrics": {
             "speed": round(current_speed, 1),
@@ -220,13 +200,46 @@ def get_telemetry():
 
 
 @router.get("/slurm/status")
-async def get_slurm_status():
-    from app.routers.slurm import get_slurm_jobs, get_slurm_nodes
-    nodes_res = await get_slurm_nodes()
-    jobs_res = await get_slurm_jobs()
+async def get_slurm_status(current_user: str = Depends(require_admin)):
+    code, stdout, _ = await run_slurm_cli_async(["sinfo", "-N", "-o", "%N|%T|%C|%m|%G|%P", "--noheader"])
+    nodes = []
+    if code == 0 and stdout:
+        for line in stdout.strip().split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split("|")
+            if len(parts) >= 5:
+                nodes.append({
+                    "node": parts[0].strip(),
+                    "state": parts[1].strip(),
+                    "cpus": parts[2].strip(),
+                    "memory": parts[3].strip(),
+                    "gres": parts[4].strip(),
+                    "partition": parts[5].strip() if len(parts) > 5 else "gpu-queue",
+                })
+
+    sq_code, sq_out, _ = await run_slurm_cli_async(["squeue", "--format=%i|%j|%P|%T|%M|%R|%b", "--noheader"])
+    jobs = []
+    if sq_code == 0 and sq_out:
+        for line in sq_out.strip().split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("|")
+            if len(parts) >= 6:
+                jobs.append({
+                    "job_id": parts[0].strip(),
+                    "name": parts[1].strip(),
+                    "partition": parts[2].strip(),
+                    "status": parts[3].strip(),
+                    "time": parts[4].strip(),
+                    "node": parts[5].strip(),
+                    "gres": parts[6].strip() if len(parts) > 6 else "gpu:1",
+                })
+
     return {
         "status": "live",
-        "nodes": nodes_res.get("nodes", []),
-        "jobs": jobs_res.get("jobs", []),
+        "nodes": nodes,
+        "jobs": jobs,
         "tunnel": TUNNEL_MANAGER.get_info(),
     }

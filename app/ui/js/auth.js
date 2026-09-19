@@ -25,7 +25,7 @@ async function checkAdminAuth() {
             if (res.ok) {
                 const data = await res.json();
                 if (data.authenticated) {
-                    showMainDashboard(data.username || 'admin');
+                    showMainDashboard(data.username || 'admin', data.role || 'viewer');
                     return true;
                 }
             }
@@ -37,14 +37,19 @@ async function checkAdminAuth() {
     return false;
 }
 
-function showMainDashboard(username) {
+function showMainDashboard(username, role) {
     const loginScreen = document.getElementById('login-screen-view');
     const mainDashboard = document.getElementById('main-dashboard-view');
     const adminUserBadge = document.getElementById('navbar-admin-user');
 
     if (loginScreen) loginScreen.classList.add('hidden');
     if (mainDashboard) mainDashboard.classList.remove('hidden');
-    if (adminUserBadge) adminUserBadge.innerText = username || 'Admin';
+    if (adminUserBadge) adminUserBadge.innerText = username || 'User';
+
+    // Apply role-based permissions immediately
+    if (typeof applyRolePermissions === 'function') {
+        applyRolePermissions(role);
+    }
 
     startBackgroundSync();
     if (typeof fetchApiKeys === 'function') fetchApiKeys();
@@ -92,16 +97,19 @@ async function performScreenLogin() {
         const data = await res.json();
 
         if (res.ok && data.status === 'ok') {
+            const role = data.role || 'viewer';
             if (remember) {
                 localStorage.setItem('hpc_admin_session', data.token);
                 localStorage.setItem('hpc_admin_username', data.username);
+                localStorage.setItem('hpc_user_role', role);
             } else {
                 sessionStorage.setItem('hpc_admin_session', data.token);
                 sessionStorage.setItem('hpc_admin_username', data.username);
+                sessionStorage.setItem('hpc_user_role', role);
             }
             adminToken = data.token;
-            showToast(`Signed in successfully as ${data.username}`, 'success');
-            showMainDashboard(data.username);
+            showToast(`Signed in as ${data.username} (${role.toUpperCase()})`, 'success');
+            showMainDashboard(data.username, role);
         } else {
             if (errBanner) {
                 errText.innerText = data.detail || 'Invalid username or password';
@@ -132,17 +140,18 @@ async function performLogout() {
 
     localStorage.removeItem('hpc_admin_session');
     localStorage.removeItem('hpc_admin_username');
+    localStorage.removeItem('hpc_user_role');
     sessionStorage.removeItem('hpc_admin_session');
     sessionStorage.removeItem('hpc_admin_username');
+    sessionStorage.removeItem('hpc_user_role');
     adminToken = '';
 
-    showToast('Signed out of admin session', 'info');
+    showToast('Signed out of session', 'info');
     showLoginScreen();
 }
 
 function startBackgroundSync() {
     stopBackgroundSync();
-    // Auto-polling disabled per user request: manual refresh only
 }
 
 function stopBackgroundSync() {

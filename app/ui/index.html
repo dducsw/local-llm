@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-50 dark:bg-[#06080d] text-slate-900 dark:text-slate-100">
+<html lang="en" class="h-full bg-slate-50 dark:bg-[#05080e] text-slate-900 dark:text-slate-100">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#06080d">
-    <title>AI Local Gateway | V100-local Dashboard</title>
+    <meta name="theme-color" content="#05080e">
+    <title>AI Local Gateway | V100 Dashboard</title>
 
     <!-- Theme bootstrap script to prevent FOUC -->
     <script>
@@ -26,7 +26,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Marked.js for full Markdown parsing -->
+    <!-- Marked.js for Markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Highlight.js for Syntax Highlighting -->
     <link rel="stylesheet"
@@ -35,7 +35,7 @@
     <!-- Chart.js CDN for Real-time Token Generation Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Google Fonts: Plus Jakarta Sans (Soft, modern) & JetBrains Mono -->
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -58,24 +58,24 @@
                             200: '#bbf7d0',
                             300: '#86efac',
                             400: '#4ade80',
-                            500: '#00ff88', // Luminous / Dạ Quang Neon Green
-                            600: '#00e676', // Electric Vivid Green
+                            500: '#00ff88', // Luminous Dạ Quang
+                            600: '#00e676',
                             700: '#00c853',
                             800: '#00a844',
                             900: '#007530',
                             950: '#004018',
                         },
                         darkSurface: {
-                            base: '#06080d',
+                            base: '#05080e',
                             card: '#0a0f18',
                             elevated: '#111827',
-                            border: '#1a2436'
+                            border: '#162032'
                         }
                     },
                     boxShadow: {
-                        'glow-neon-sm': '0 0 12px rgba(0, 255, 136, 0.25)',
-                        'glow-neon': '0 0 24px rgba(0, 255, 136, 0.35)',
-                        'glow-neon-lg': '0 0 40px rgba(0, 255, 136, 0.45)',
+                        'glow-neon-sm': '0 0 10px rgba(0, 255, 136, 0.25)',
+                        'glow-neon': '0 0 20px rgba(0, 255, 136, 0.35)',
+                        'glow-neon-lg': '0 0 35px rgba(0, 255, 136, 0.45)',
                     }
                 }
             }
@@ -83,16 +83,16 @@
     </script>
 
     <!-- Custom Modular CSS Stylesheet -->
-    <link rel="stylesheet" href="css/style.css?v=2.6.0">
+    <link rel="stylesheet" href="css/style.css?v=3.3.0">
 </head>
 
-<body class="min-h-full font-sans antialiased bg-slate-50 dark:bg-[#06080d] text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-300">
+<body class="min-h-full font-sans antialiased bg-slate-50 dark:bg-[#05080e] text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">
 
     <!-- ========================================================================= -->
     <!-- 1. FULLSCREEN AUTHENTICATION / LOGIN SCREEN                               -->
     <!-- ========================================================================= -->
     <div id="login-screen-view"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-100/90 dark:bg-[#06080d]/95 backdrop-blur-md p-4 transition-colors duration-300">
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-100/95 dark:bg-[#05080e]/95 backdrop-blur-md p-4 transition-colors duration-200">
         
         <!-- Floating Theme Switcher -->
         <button onclick="toggleTheme()"
@@ -101,28 +101,45 @@
             <i data-lucide="moon" id="login-theme-icon" class="w-5 h-5"></i>
         </button>
 
-        <!-- Clean Neon Login Card -->
+        <!-- Clean Luminous Login Card -->
         <div
-            class="w-full max-w-md bg-white dark:bg-[#0a0f18] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-8 sm:p-10 shadow-xl dark:shadow-glow-neon space-y-7 transition-all">
+            class="w-full max-w-md bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-10 shadow-2xl space-y-6 transition-all">
             
             <!-- Brand & Icon -->
-            <div class="text-center space-y-2.5">
-                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-neon-50 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30 text-neon-700 dark:text-neon-500 mb-1 shadow-sm dark:shadow-glow-neon-sm">
+            <div class="text-center space-y-2">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-neon-50 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30 text-neon-600 dark:text-neon-500 p-3 mb-1 shadow-glow-neon-sm">
                     <i data-lucide="cpu" class="w-7 h-7"></i>
                 </div>
                 <div class="flex items-center justify-center gap-1.5 font-extrabold text-2xl tracking-tight">
                     <span class="text-slate-900 dark:text-white">AI Local</span>
-                    <span class="text-neon-700 dark:text-neon-500 dark:neon-glow-text">Gateway</span>
+                    <span class="text-neon-600 dark:text-neon-500 neon-glow-text font-black">Gateway</span>
                 </div>
                 <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">
                     NVIDIA Tesla V100 • vLLM & Slurm Monitoring Console
                 </p>
             </div>
 
+            <!-- Quick Demo Credentials Hint Buttons -->
+            <div class="p-3 bg-slate-50 dark:bg-[#111827]/70 rounded-2xl border border-slate-200/70 dark:border-slate-800 space-y-2 text-xs">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block text-center">Quick Login</span>
+                <div class="flex gap-2">
+                    <button type="button" onclick="quickFillLogin('admin', 'admin123')"
+                        class="flex-1 py-1.5 px-2.5 rounded-xl bg-neon-500/10 hover:bg-neon-500/20 text-neon-700 dark:text-neon-400 border border-neon-500/30 font-semibold text-[11px] flex items-center justify-center gap-1 transition-all">
+                        <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                        <span>Admin</span>
+                    </button>
+                    <button type="button" onclick="quickFillLogin('viewer', 'viewer123')"
+                        class="flex-1 py-1.5 px-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-semibold text-[11px] flex items-center justify-center gap-1 transition-all">
+                        <i data-lucide="user" class="w-3.5 h-3.5"></i>
+                        <span>Viewer</span>
+                    </button>
+                </div>
+            </div>
+
             <!-- Error Banner -->
             <div id="login-error-banner"
                 class="hidden p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 rounded-xl text-rose-700 dark:text-rose-300 text-xs text-center font-medium flex items-center justify-center gap-2">
-                <i data-lucide="alert-circle" class="w-4 h-4 text-rose-500"></i>
+                <i data-lucide="alert-circle" class="w-4 h-4 text-rose-500 shrink-0"></i>
                 <span id="login-error-text">Invalid username or password</span>
             </div>
 
@@ -136,7 +153,7 @@
                         </span>
                         <input id="screen-login-user" type="text" required
                             class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-slate-900 dark:text-slate-100 text-xs focus:bg-white dark:focus:bg-[#111827] focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500 transition-all"
-                            placeholder="Enter username">
+                            placeholder="Enter username (e.g. admin)">
                     </div>
                 </div>
 
@@ -155,7 +172,7 @@
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between text-xs pt-1">
+                <div class="flex items-center justify-between text-xs pt-0.5">
                     <label class="flex items-center gap-2 cursor-pointer text-slate-500 dark:text-slate-400 select-none">
                         <input id="remember-session" type="checkbox" checked
                             class="w-4 h-4 rounded border-slate-300 text-neon-600 focus:ring-neon-500 accent-neon-600 cursor-pointer">
@@ -164,7 +181,7 @@
                 </div>
 
                 <button id="btn-login-submit" type="submit"
-                    class="w-full py-3 bg-gradient-to-r from-neon-600 via-neon-500 to-emerald-400 hover:from-neon-500 hover:to-emerald-300 text-slate-950 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md dark:shadow-glow-neon flex items-center justify-center gap-2 mt-2">
+                    class="w-full py-3 bg-neon-500 hover:bg-neon-400 text-slate-950 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-glow-neon flex items-center justify-center gap-2 mt-2">
                     <i data-lucide="log-in" class="w-4 h-4"></i>
                     <span id="btn-login-text">Sign In to Dashboard</span>
                 </button>
@@ -179,19 +196,19 @@
 
         <!-- Top Navigation Header -->
         <header
-            class="border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-[#0a0f18]/90 backdrop-blur-md sticky top-0 z-40 transition-colors duration-200">
+            class="border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#0a0f18]/95 backdrop-blur-md sticky top-0 z-40 transition-colors duration-200">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
                 
                 <!-- Brand & Logo -->
                 <div class="flex items-center gap-3 lg:gap-6 shrink-0">
                     <div class="flex items-center gap-2.5 cursor-pointer select-none group shrink-0" onclick="switchNavTab('telemetry')">
-                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-neon-600 via-neon-500 to-emerald-400 text-slate-950 flex items-center justify-center shadow-sm dark:shadow-glow-neon-sm group-hover:scale-105 transition-transform font-black shrink-0">
+                        <div class="w-9 h-9 rounded-xl bg-neon-500 text-slate-950 flex items-center justify-center shadow-glow-neon-sm group-hover:scale-105 transition-transform font-black shrink-0">
                             <i data-lucide="cpu" class="w-5 h-5"></i>
                         </div>
                         <div class="shrink-0">
                             <div class="flex items-center gap-1 font-extrabold text-lg tracking-tight leading-none whitespace-nowrap">
                                 <span class="text-slate-900 dark:text-white">AI Local</span>
-                                <span class="text-neon-700 dark:text-neon-500 dark:neon-glow-text">Gateway</span>
+                                <span class="text-neon-600 dark:text-neon-500 neon-glow-text">Gateway</span>
                             </div>
                             <span class="text-[10px] text-slate-400 dark:text-slate-500 font-mono block whitespace-nowrap">v100-hpc-cluster</span>
                         </div>
@@ -202,19 +219,19 @@
                     <!-- Desktop Navigation Tabs -->
                     <nav class="hidden md:flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-[#111827] rounded-xl border border-slate-200/60 dark:border-slate-800 text-xs font-semibold shrink-0">
                         <button data-nav-tab="telemetry" onclick="switchNavTab('telemetry')"
-                            class="px-3.5 py-1.5 rounded-lg bg-white dark:bg-neon-500 text-neon-800 dark:text-slate-950 font-black shadow-sm dark:shadow-glow-neon-sm transition-all flex items-center gap-2 whitespace-nowrap shrink-0">
+                            class="px-3.5 py-1.5 rounded-lg bg-white dark:bg-neon-500 text-neon-800 dark:text-slate-950 font-black shadow-sm transition-all flex items-center gap-2 whitespace-nowrap shrink-0">
                             <i data-lucide="gauge" class="w-4 h-4 shrink-0"></i>
                             <span>Telemetry & Models</span>
-                        </button>
-                        <button data-nav-tab="slurm" onclick="switchNavTab('slurm')"
-                            class="px-3.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2 whitespace-nowrap shrink-0">
-                            <i data-lucide="layers" class="w-4 h-4 shrink-0"></i>
-                            <span>Slurm HPC Cluster</span>
                         </button>
                         <button data-nav-tab="chatbot" onclick="switchNavTab('chatbot')"
                             class="px-3.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2 whitespace-nowrap shrink-0">
                             <i data-lucide="message-square" class="w-4 h-4 shrink-0"></i>
                             <span>AI Chat Studio</span>
+                        </button>
+                        <button data-nav-tab="slurm" onclick="switchNavTab('slurm')"
+                            class="px-3.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2 whitespace-nowrap shrink-0">
+                            <i data-lucide="layers" class="w-4 h-4 shrink-0"></i>
+                            <span>Slurm HPC Cluster</span>
                         </button>
                         <button data-nav-tab="keys" onclick="switchNavTab('keys')"
                             class="px-3.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-2 whitespace-nowrap shrink-0">
@@ -227,9 +244,9 @@
                 <!-- Right Header Actions -->
                 <div class="flex items-center gap-2.5 shrink-0">
                     
-                    <!-- Gateway Live Status Indicator (Dạ quang pulsing) -->
+                    <!-- Gateway Live Status Indicator -->
                     <div id="backend-status-badge"
-                        class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neon-50 dark:bg-neon-500/10 border border-neon-300 dark:border-neon-500/30 text-neon-800 dark:text-neon-400 font-semibold text-xs shadow-sm dark:shadow-glow-neon-sm whitespace-nowrap shrink-0">
+                        class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neon-50 dark:bg-neon-500/10 border border-neon-300 dark:border-neon-500/30 text-neon-800 dark:text-neon-400 font-semibold text-xs shadow-sm whitespace-nowrap shrink-0">
                         <span class="w-2 h-2 bg-neon-500 rounded-full animate-neon-pulse shrink-0"></span>
                         <span id="backend-status-text" class="font-mono font-bold whitespace-nowrap">GATEWAY: ONLINE</span>
                     </div>
@@ -241,14 +258,17 @@
                         <i data-lucide="moon" id="theme-icon" class="w-4 h-4"></i>
                     </button>
 
+                    <!-- User Role Badge (Hidden fallback for JS compatibility) -->
+                    <span id="navbar-role-badge" class="hidden"><span id="navbar-role-text">ADMIN</span></span>
+
                     <!-- User / Settings Dropdown Toggle -->
                     <div class="relative shrink-0" id="header-settings-dropdown-wrapper">
                         <button id="btn-settings-toggle" onclick="toggleSettingsMenu(event)"
                             class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111827] dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-all shadow-sm whitespace-nowrap">
-                            <div class="w-5 h-5 rounded-full bg-gradient-to-r from-neon-600 to-emerald-400 text-slate-950 flex items-center justify-center text-[10px] font-black shrink-0">
-                                A
+                            <div class="w-5 h-5 rounded-full bg-neon-500 text-slate-950 flex items-center justify-center text-[10px] font-black shrink-0">
+                                <span id="navbar-user-initial">A</span>
                             </div>
-                            <span id="header-admin-user" class="font-mono font-bold">ADMIN</span>
+                            <span id="navbar-admin-user" class="font-mono font-bold">admin</span>
                             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
                         </button>
 
@@ -267,11 +287,11 @@
                             <div class="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
                                 <div class="flex items-center justify-between">
                                     <span>Proxy Port:</span>
-                                    <span class="font-mono text-slate-800 dark:text-slate-200 font-bold">127.0.0.1:9000</span>
+                                    <span class="font-mono text-slate-800 dark:text-slate-200 font-bold">127.0.0.1:9001</span>
                                 </div>
                                 <div class="flex items-center justify-between">
                                     <span>Inference Backend:</span>
-                                    <span class="font-mono text-neon-700 dark:text-neon-400 font-bold">vLLM / SM70</span>
+                                    <span class="font-mono text-neon-600 dark:text-neon-400 font-bold">vLLM / SM70</span>
                                 </div>
                                 <div class="flex items-center justify-between">
                                     <span>Slurm Partitions:</span>
@@ -299,15 +319,15 @@
                     <i data-lucide="gauge" class="w-3.5 h-3.5"></i>
                     <span>Telemetry</span>
                 </button>
-                <button data-nav-tab="slurm" onclick="switchNavTab('slurm')"
-                    class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-[#111827] text-slate-700 dark:text-slate-300 font-semibold whitespace-nowrap flex items-center gap-1.5 text-[11px]">
-                    <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-                    <span>Slurm</span>
-                </button>
                 <button data-nav-tab="chatbot" onclick="switchNavTab('chatbot')"
                     class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-[#111827] text-slate-700 dark:text-slate-300 font-semibold whitespace-nowrap flex items-center gap-1.5 text-[11px]">
                     <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
                     <span>Chatbot</span>
+                </button>
+                <button data-nav-tab="slurm" onclick="switchNavTab('slurm')"
+                    class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-[#111827] text-slate-700 dark:text-slate-300 font-semibold whitespace-nowrap flex items-center gap-1.5 text-[11px]">
+                    <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                    <span>Slurm</span>
                 </button>
                 <button data-nav-tab="keys" onclick="switchNavTab('keys')"
                     class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-[#111827] text-slate-700 dark:text-slate-300 font-semibold whitespace-nowrap flex items-center gap-1.5 text-[11px]">
@@ -321,23 +341,53 @@
         <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full space-y-6">
 
             <!-- ========================================================================= -->
-            <!-- VIEW 1: INFERENCE TELEMETRY, MODELS & HARDWARE OVERVIEW                  -->
+            <!-- VIEW 1: INFERENCE TELEMETRY & MODELS (SIMPLIFIED & CLEAN)                 -->
             <!-- ========================================================================= -->
             <div id="view-telemetry" class="space-y-4">
 
-                <!-- COMPACT TOP BAR WITH RIGHT-ALIGNED MODEL FILTER -->
-                <div class="flex items-center justify-between gap-3 text-xs">
-                    <div class="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                <!-- Top Bar with Model Dropdown and Status -->
+                <div class="flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div class="flex items-center gap-2.5 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px]">
                         <span class="w-2 h-2 rounded-full bg-neon-500 animate-neon-pulse"></span>
-                        <span>Telemetry & Cluster Overview</span>
+                        <span>Cluster Telemetry & Observability</span>
+                        <span id="telemetry-sse-status" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-neon-50 dark:bg-neon-500/10 border border-neon-300 dark:border-neon-500/30 text-[10px] font-mono shadow-sm">
+                            <span class="w-1.5 h-1.5 rounded-full bg-neon-500 animate-ping"></span>
+                            <span class="text-neon-600 dark:text-neon-400 font-semibold">CONNECTING...</span>
+                        </span>
                     </div>
 
                     <div class="flex items-center gap-2 shrink-0">
+                        <!-- Direct Link to AI Chat Studio -->
+                        <button onclick="switchNavTab('chatbot')"
+                            class="flex items-center gap-1.5 px-3 py-1.5 bg-neon-500 hover:bg-neon-400 text-slate-950 rounded-xl text-xs font-black shadow-glow-neon-sm transition-all group">
+                            <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+                            <span>Open Chat Studio</span>
+                            <i data-lucide="arrow-right" class="w-3 h-3 group-hover:translate-x-0.5 transition-transform"></i>
+                        </button>
+
+                        <!-- Langfuse Traces Shortcut Link -->
+                        <a href="http://localhost:3000" target="_blank" rel="noopener noreferrer"
+                            class="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#0a0f18] hover:bg-slate-50 dark:hover:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold shadow-sm transition-all text-slate-700 dark:text-slate-200 hover:text-neon-400 group"
+                            title="Open Langfuse Observability Console (Port 3000)">
+                            <i data-lucide="activity" class="w-3.5 h-3.5 text-neon-500 group-hover:scale-110 transition-transform"></i>
+                            <span class="text-[11px] font-bold">Langfuse</span>
+                            <i data-lucide="external-link" class="w-3 h-3 text-slate-400 group-hover:text-neon-400"></i>
+                        </a>
+
+                        <!-- Grafana Metrics Shortcut Link -->
+                        <a href="http://localhost:3002/d/llm-serving-platform-v1/llm-serving-platform-live-telemetry" target="_blank" rel="noopener noreferrer"
+                            class="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#0a0f18] hover:bg-slate-50 dark:hover:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold shadow-sm transition-all text-slate-700 dark:text-slate-200 hover:text-amber-400 group"
+                            title="Open Pre-configured Grafana LLMOps Dashboard (Port 3002)">
+                            <i data-lucide="bar-chart-2" class="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform"></i>
+                            <span class="text-[11px] font-bold">Grafana</span>
+                            <i data-lucide="external-link" class="w-3 h-3 text-slate-400 group-hover:text-amber-400"></i>
+                        </a>
+
                         <!-- Custom Model Dropdown Selector -->
                         <div class="relative shrink-0" id="global-model-dropdown-wrapper">
                             <button id="btn-model-selector-toggle" onclick="toggleModelDropdown(event)"
-                                class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#0a0f18] hover:bg-slate-50 dark:hover:bg-[#111827] border border-slate-200/90 dark:border-slate-800 rounded-xl text-xs font-semibold shadow-sm transition-all group">
-                                <i data-lucide="box" class="w-3.5 h-3.5 text-neon-700 dark:text-neon-400 group-hover:scale-110 transition-transform shrink-0"></i>
+                                class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#0a0f18] hover:bg-slate-50 dark:hover:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold shadow-sm transition-all group">
+                                <i data-lucide="box" class="w-3.5 h-3.5 text-neon-600 dark:text-neon-400 group-hover:scale-110 transition-transform shrink-0"></i>
                                 <span class="text-[11px] font-bold text-slate-400 uppercase shrink-0">MODEL:</span>
                                 <span id="global-model-selected-label" class="font-mono font-bold text-slate-900 dark:text-white">--</span>
                                 <i data-lucide="chevron-down" id="model-dropdown-chevron" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0"></i>
@@ -345,10 +395,10 @@
 
                             <!-- Custom Dropdown Popover List -->
                             <div id="global-model-dropdown-menu"
-                                class="hidden absolute right-0 mt-2 min-w-[260px] bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl dark:shadow-glow-neon p-2 space-y-1 z-50 transition-all backdrop-blur-md">
-                                <div class="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                                class="hidden absolute right-0 mt-2 min-w-[260px] bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-2 space-y-1 z-50 transition-all">
+                                <div class="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                     <span>Available Models</span>
-                                    <span id="model-dropdown-count" class="text-neon-700 dark:text-neon-400 font-mono font-bold">1</span>
+                                    <span id="model-dropdown-count" class="text-neon-600 dark:text-neon-400 font-mono font-bold">1</span>
                                 </div>
                                 <div id="global-model-items-list" class="space-y-1 max-h-56 overflow-y-auto pr-1">
                                     <!-- Populated dynamically via JS -->
@@ -357,7 +407,7 @@
                         </div>
 
                         <button onclick="refreshDashboardTelemetry()" title="Refresh Telemetry Metrics"
-                            class="p-2 bg-white hover:bg-slate-50 dark:bg-[#0a0f18] dark:hover:bg-slate-800/80 border border-slate-200/90 dark:border-slate-800 rounded-xl text-slate-600 dark:text-slate-300 hover:text-neon-500 text-xs transition-all shadow-sm flex items-center justify-center">
+                            class="p-2 bg-white hover:bg-slate-50 dark:bg-[#0a0f18] dark:hover:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl text-slate-600 dark:text-slate-300 hover:text-neon-500 text-xs transition-all shadow-sm flex items-center justify-center">
                             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
                         </button>
                     </div>
@@ -367,10 +417,10 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
                     <!-- Card 1: Active Serving Model -->
-                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3 transition-all">
+                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Serving Model</span>
-                            <span id="metric-model-status-badge" class="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 text-[10px] font-bold font-mono">
+                            <span id="metric-model-status-badge" class="px-2 py-0.5 rounded-full bg-neon-50 dark:bg-neon-500/10 text-neon-700 dark:text-neon-400 border border-neon-200 dark:border-neon-500/30 text-[10px] font-bold font-mono">
                                 SERVING
                             </span>
                         </div>
@@ -381,18 +431,18 @@
                             <span id="metric-model-upstream" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block truncate">127.0.0.1:18000 (vLLM Engine)</span>
                         </div>
                         <div class="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                            <span class="text-slate-400">Owner / Cluster</span>
-                            <span id="metric-model-provider" class="font-bold text-neon-700 dark:text-neon-400 font-mono">vLLM • QOS gpu-q</span>
+                            <span class="text-slate-400">KV Cache / Req</span>
+                            <span id="metric-model-kv-cache" class="font-bold text-neon-600 dark:text-neon-400 font-mono">100% free • 0 active</span>
                         </div>
                     </div>
 
                     <!-- Card 2: GPU VRAM & Hardware HUD -->
-                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3 transition-all">
+                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">GPU VRAM & Util</span>
                             <div class="flex items-center gap-1.5">
                                 <span id="metric-gpu-temp-badge" class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">STANDBY</span>
-                                <div class="w-8 h-8 rounded-xl bg-neon-50 dark:bg-neon-500/10 text-neon-700 dark:text-neon-400 flex items-center justify-center dark:shadow-glow-neon-sm">
+                                <div class="w-8 h-8 rounded-xl bg-neon-50 dark:bg-neon-500/10 text-neon-600 dark:text-neon-400 flex items-center justify-center">
                                     <i data-lucide="hard-drive" class="w-4 h-4"></i>
                                 </div>
                             </div>
@@ -406,7 +456,7 @@
                                 <span id="metric-vram-pct" class="text-xs font-mono font-bold text-neon-600 dark:text-neon-400">0.0%</span>
                             </div>
                             <div class="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                                <div id="metric-vram-bar" class="bg-gradient-to-r from-neon-500 to-emerald-400 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
+                                <div id="metric-vram-bar" class="bg-neon-500 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
                             </div>
                         </div>
                         <div class="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
@@ -418,7 +468,7 @@
                     </div>
 
                     <!-- Card 3: Inference Speed & TTFT -->
-                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3 transition-all">
+                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Generation Speed</span>
                             <div class="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
@@ -436,10 +486,10 @@
                     </div>
 
                     <!-- Card 4: Gateway Activity & Total Tokens -->
-                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3 transition-all">
+                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gateway Requests</span>
-                            <div class="w-8 h-8 rounded-xl bg-neon-50 dark:bg-neon-500/10 text-neon-700 dark:text-neon-400 flex items-center justify-center dark:shadow-glow-neon-sm">
+                            <div class="w-8 h-8 rounded-xl bg-neon-50 dark:bg-neon-500/10 text-neon-600 dark:text-neon-400 flex items-center justify-center">
                                 <i data-lucide="activity" class="w-4 h-4"></i>
                             </div>
                         </div>
@@ -449,14 +499,14 @@
                         </div>
                         <div class="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                             <span class="text-slate-400">Tokens Generated</span>
-                            <span id="metric-total-tokens" class="font-bold text-neon-700 dark:text-neon-400 font-mono">0</span>
+                            <span id="metric-total-tokens" class="font-bold text-neon-600 dark:text-neon-400 font-mono">0</span>
                         </div>
                     </div>
 
                 </div>
 
                 <!-- REAL-TIME TELEMETRY TIMELINE CHART -->
-                <div class="glass-card rounded-2xl p-6 shadow-sm space-y-5 transition-all">
+                <div class="glass-card rounded-2xl p-6 shadow-sm space-y-5">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                         <div class="flex items-center gap-2.5">
                             <div class="w-2.5 h-2.5 rounded-full bg-neon-500 animate-neon-pulse"></div>
@@ -471,11 +521,11 @@
                         <!-- Legend & Auto-Sync Pill -->
                         <div class="flex items-center gap-3 text-xs">
                             <div class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
-                                <span class="w-3 h-3 rounded bg-neon-600 inline-block shadow-sm"></span>
+                                <span class="w-3 h-3 rounded bg-neon-500 inline-block shadow-sm"></span>
                                 <span>Tokens / Min</span>
                             </div>
                             <div class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
-                                <span class="w-3 h-3 rounded bg-neon-400 inline-block shadow-sm"></span>
+                                <span class="w-3 h-3 rounded bg-sky-400 inline-block shadow-sm"></span>
                                 <span>Cumulative</span>
                             </div>
                             <span class="px-2.5 py-1 rounded-lg bg-neon-50 dark:bg-neon-500/10 text-neon-800 dark:text-neon-400 font-mono text-[10px] font-bold border border-neon-200 dark:border-neon-500/30">
@@ -486,7 +536,7 @@
 
                     <!-- Dual Chart & Quick Stats Grid -->
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                        <div class="lg:col-span-8 h-64 relative bg-slate-50/50 dark:bg-[#06080d]/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <div class="lg:col-span-8 h-64 relative bg-slate-50/50 dark:bg-[#05080e]/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                             <canvas id="throughput-chart"></canvas>
                         </div>
 
@@ -500,11 +550,11 @@
                                 </div>
                                 <div class="flex justify-between items-center text-xs">
                                     <span class="text-slate-600 dark:text-slate-400">Completion Tokens (Out)</span>
-                                    <span id="stat-completion-tokens" class="font-bold text-neon-700 dark:text-neon-400 font-mono">0</span>
+                                    <span id="stat-completion-tokens" class="font-bold text-neon-600 dark:text-neon-400 font-mono">0</span>
                                 </div>
                                 <div class="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs font-bold">
                                     <span class="text-slate-800 dark:text-slate-200">Total Volume</span>
-                                    <span id="stat-total-tokens" class="text-neon-700 dark:text-neon-400 font-mono text-sm font-black">0</span>
+                                    <span id="stat-total-tokens" class="text-neon-600 dark:text-neon-400 font-mono text-sm font-black">0</span>
                                 </div>
                             </div>
 
@@ -514,8 +564,8 @@
                                     <span class="font-bold text-slate-600 dark:text-slate-400">Throughput Velocity</span>
                                     <span id="stat-speed-label" class="font-bold text-amber-600 dark:text-amber-400 font-mono">0.0 tok/s</span>
                                 </div>
-                                <div class="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                                    <div id="stat-speed-bar" class="bg-gradient-to-r from-neon-500 to-amber-400 h-full rounded-full transition-all duration-500 shadow-sm" style="width: 0%;"></div>
+                                <div class="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div id="stat-speed-bar" class="bg-neon-500 h-full rounded-full transition-all duration-500 shadow-sm" style="width: 0%;"></div>
                                 </div>
                                 <div class="flex justify-between text-[10px] text-slate-400 font-mono">
                                     <span>0</span>
@@ -527,193 +577,316 @@
                     </div>
                 </div>
 
-                <!-- MAIN WORKSPACE: 2-COLUMN (Playground & Audit Ledger) -->
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- TEST INFERENCE (MINIMAL & SIMPLE) -->
+                <div class="glass-card rounded-2xl p-5 shadow-sm space-y-4">
+                    <!-- Clean Minimal Header with Live tok/s & VRAM Telemetry -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-2 h-2 rounded-full bg-neon-500 shadow-sm animate-pulse"></span>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                                Test Inference
+                            </h3>
+                            <span id="play-status-pill" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800/80 text-slate-500 border border-slate-200 dark:border-slate-700">Ready</span>
+                        </div>
 
-                    <!-- LEFT: Inference Playground (7 Cols) -->
-                    <div class="lg:col-span-7 space-y-6">
-                        <div class="glass-card rounded-2xl p-6 shadow-sm space-y-5 transition-all">
-                            
-                            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-2.5 h-2.5 rounded-full bg-neon-500 shadow-sm"></div>
-                                    <h2 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                                        Inference Playground (/v1/chat/completions)
-                                    </h2>
-                                </div>
-                                <span class="px-2.5 py-0.5 rounded-full bg-neon-50 dark:bg-neon-500/10 text-neon-800 dark:text-neon-400 border border-neon-200 dark:border-neon-500/30 text-[10px] font-mono font-bold">
-                                    STREAMING SSE
-                                </span>
+                        <!-- Compact Live Metrics: tok/s, VRAM, TTFT -->
+                        <div class="flex items-center gap-3 text-xs font-mono">
+                            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400">
+                                <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                                <span id="hud-speed" class="font-bold">0.0 tok/s</span>
                             </div>
-
-                            <!-- Playground Controls Row -->
-                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
-                                <div>
-                                    <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1.5">Target Model</label>
-                                    <select id="play-model-select"
-                                        class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
-                                        <option value="">Loading models...</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1.5">
-                                        Max Tokens (<span id="val-max-tokens" class="text-neon-700 dark:text-neon-400 font-mono">512</span>)
-                                    </label>
-                                    <input type="range" id="play-max-tokens" min="64" max="2048" step="64" value="512"
-                                        oninput="document.getElementById('val-max-tokens').innerText = this.value"
-                                        class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500 mt-2">
-                                </div>
-                                <div>
-                                    <label class="block text-slate-600 dark:text-slate-400 font-bold mb-1.5">
-                                        Temperature (<span id="val-temp" class="text-neon-700 dark:text-neon-400 font-mono">0.2</span>)
-                                    </label>
-                                    <input type="range" id="play-temperature" min="0.0" max="1.0" step="0.05" value="0.20"
-                                        oninput="document.getElementById('val-temp').innerText = this.value"
-                                        class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500 mt-2">
-                                </div>
+                            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neon-500/10 border border-neon-500/30 text-neon-600 dark:text-neon-400">
+                                <i data-lucide="hard-drive" class="w-3.5 h-3.5"></i>
+                                <span id="hud-vram" class="font-bold">-- GB</span>
                             </div>
-
-                            <!-- System Prompt -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1.5">
-                                    <label class="text-xs text-slate-600 dark:text-slate-400 font-bold uppercase">System Prompt</label>
-                                    <button type="button" onclick="toggleSystemPrompt()"
-                                        class="text-[11px] text-neon-700 dark:text-neon-400 hover:underline font-bold">Toggle Expand</button>
-                                </div>
-                                <textarea id="play-system-prompt" rows="2"
-                                    placeholder="You are an enterprise AI assistant running locally on an NVIDIA Tesla V100 GPU."
-                                    class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500"></textarea>
+                            <div class="hidden sm:flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                <span>TTFT:</span>
+                                <span id="hud-ttft" class="font-bold text-slate-800 dark:text-slate-200">-- ms</span>
                             </div>
-
-                            <!-- User Prompt -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1.5">
-                                    <label class="text-xs text-slate-600 dark:text-slate-400 font-bold uppercase">User Prompt</label>
-                                    <span class="text-[11px] text-slate-400">Ctrl + Enter to run</span>
-                                </div>
-                                <textarea id="play-prompt" rows="4"
-                                    placeholder="Enter your prompt or leave blank to use default speed benchmark prompt..."
-                                    class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">Explain the key differences between FP16 and GGUF Q4_K_M quantization in vLLM on NVIDIA Tesla V100 GPU in 3 concise paragraphs.</textarea>
-
-                                <!-- Preset Prompt Chips -->
-                                <div class="flex flex-wrap gap-2 mt-2.5">
-                                    <button type="button"
-                                        onclick="setPresetPrompt('Explain the key differences between FP16 and GGUF Q4_K_M quantization in vLLM on NVIDIA Tesla V100 GPU in 3 concise paragraphs.')"
-                                        class="px-2.5 py-1 rounded-lg bg-neon-50 hover:bg-neon-100 dark:bg-neon-500/10 dark:hover:bg-neon-500/20 text-neon-800 dark:text-neon-400 text-xs font-bold border border-neon-200 dark:border-neon-500/30 transition-colors flex items-center gap-1">
-                                        <i data-lucide="zap" class="w-3 h-3 text-neon-500"></i>
-                                        <span>⚡ Speed Benchmark</span>
-                                    </button>
-                                    <button type="button"
-                                        onclick="setPresetPrompt('Explain the vLLM architecture and PagedAttention mechanism in 4 concise sentences.')"
-                                        class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-neon-50 dark:bg-[#111827] dark:hover:bg-neon-500/10 text-slate-700 hover:text-neon-800 dark:text-slate-300 dark:hover:text-neon-400 text-xs font-medium border border-slate-200 dark:border-slate-800 transition-colors">
-                                        PagedAttention
-                                    </button>
-                                    <button type="button"
-                                        onclick="setPresetPrompt('Write Python code to stream chat completions from the OpenAI-compatible gateway at 127.0.0.1:9000.')"
-                                        class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-neon-50 dark:bg-[#111827] dark:hover:bg-neon-500/10 text-slate-700 hover:text-neon-800 dark:text-slate-300 dark:hover:text-neon-400 text-xs font-medium border border-slate-200 dark:border-slate-800 transition-colors">
-                                        Python Client Code
-                                    </button>
-                                    <button type="button"
-                                        onclick="setPresetPrompt('Compare inference performance between GGUF Q4_K_M quantization and FP16 weights on NVIDIA V100 GPU.')"
-                                        class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-neon-50 dark:bg-[#111827] dark:hover:bg-neon-500/10 text-slate-700 hover:text-neon-800 dark:text-slate-300 dark:hover:text-neon-400 text-xs font-medium border border-slate-200 dark:border-slate-800 transition-colors">
-                                        GGUF vs FP16
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Execution Controls -->
-                            <div class="flex items-center gap-3 pt-1">
-                                <button id="send-infer-btn" onclick="executeInference()"
-                                    class="flex-1 py-3 bg-gradient-to-r from-neon-600 via-neon-500 to-emerald-400 hover:from-neon-500 hover:to-emerald-300 text-slate-950 rounded-xl font-black text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-md dark:shadow-glow-neon transition-all">
-                                    <i data-lucide="play" class="w-4 h-4 fill-slate-950"></i>
-                                    <span>Run Inference</span>
-                                </button>
-                                <button id="abort-infer-btn" onclick="abortInference()"
-                                    class="px-5 py-3 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-xl font-bold text-xs uppercase hidden transition-all">
-                                    Stop
-                                </button>
-                            </div>
-
-                            <!-- Output Response Window -->
-                            <div class="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                <div class="flex items-center justify-between text-xs">
-                                    <span class="font-bold text-slate-700 dark:text-slate-300 uppercase flex items-center gap-1.5">
-                                        <span class="w-2 h-2 rounded-full bg-neon-500"></span>
-                                        Response Stream Console
-                                    </span>
-                                    <div id="infer-telemetry-hud" class="text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-3">
-                                        <span>TTFT: <strong id="hud-ttft" class="text-slate-900 dark:text-white">--</strong></span>
-                                        <span>Time: <strong id="hud-time" class="text-slate-900 dark:text-white">--</strong></span>
-                                        <span>Tokens: <strong id="hud-tokens" class="text-neon-700 dark:text-neon-400 font-bold">0</strong></span>
-                                    </div>
-                                </div>
-
-                                <div id="play-output"
-                                    class="w-full min-h-[160px] max-h-[360px] overflow-y-auto bg-slate-950 dark:bg-[#06080d] text-neon-400 p-4 text-xs font-mono whitespace-pre-wrap rounded-xl border border-slate-800 selection:bg-neon-500 selection:text-slate-950">
-// Model response stream output will appear here in real-time...
-                                </div>
-                            </div>
-
                         </div>
                     </div>
 
-                    <!-- RIGHT: Inference Ledger & Hardware Spec (5 Cols) -->
-                    <div class="lg:col-span-5 space-y-6">
+                    <!-- Prompt Input -->
+                    <div class="space-y-2">
+                        <textarea id="play-prompt" rows="2"
+                            placeholder="Enter prompt to test model inference..."
+                            class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">Benchmark inference performance and calculate tok/s throughput on NVIDIA Tesla V100 GPU.</textarea>
 
-                        <!-- Inference Audit Ledger -->
-                        <div class="glass-card rounded-2xl p-5 shadow-sm space-y-4 transition-all">
-                            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <!-- Minimal Controls Bar: Model Select & Run Button -->
+                        <div class="flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                            <div class="flex items-center gap-2">
+                                <label class="text-slate-400 text-[11px] font-bold uppercase">Model:</label>
+                                <select id="play-model-select"
+                                    class="bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-neon-500">
+                                    <option value="qwen3.5-9b">qwen3.5-9b</option>
+                                </select>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <button id="send-infer-btn" onclick="executeInference()"
+                                    class="px-4 py-2 bg-neon-500 hover:bg-neon-400 text-slate-950 rounded-xl font-black text-xs uppercase flex items-center gap-1.5 shadow-glow-neon-sm transition-all">
+                                    <i data-lucide="play" class="w-3.5 h-3.5 fill-slate-950"></i>
+                                    <span>Run</span>
+                                </button>
+                                <button id="abort-infer-btn" onclick="abortInference()"
+                                    class="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs uppercase hidden transition-all flex items-center gap-1">
+                                    <span>Stop</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Output Console -->
+                    <div id="play-output"
+                        class="w-full h-36 overflow-y-auto bg-[#04060a] text-neon-400 p-3.5 text-xs font-mono whitespace-pre-wrap rounded-xl border border-slate-800 selection:bg-neon-500 selection:text-slate-950">
+// Streaming output and live benchmark result will appear here...
+                    </div>
+                </div>
+
+                <!-- Hidden Fallbacks for background scripts compatibility -->
+                <div class="hidden" aria-hidden="true">
+                    <input type="range" id="play-max-tokens" value="512">
+                    <span id="val-max-tokens">512</span>
+                    <input type="range" id="play-temperature" value="0.7">
+                    <span id="val-temp">0.7</span>
+                    <textarea id="play-system-prompt"></textarea>
+                    <span id="hud-tokens">0</span>
+                    <span id="hud-time">0.0s</span>
+                    <table><tbody id="audit-logs-table-body"></tbody></table>
+                    <div id="tx-feed-container"></div>
+                    <span id="page-info-text"></span>
+                    <div id="infer-telemetry-hud"></div>
+                </div>
+
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- VIEW 2: AI CHATBOT WORKSPACE (FOCUSED, SPACIOUS & USER-FRIENDLY)          -->
+            <!-- ========================================================================= -->
+            <div id="view-chatbot" class="space-y-4 hidden">
+
+                <!-- Collapsible Parameters Drawer (Easily toggled from header) -->
+                <div id="chat-parameters-drawer" class="hidden glass-card rounded-2xl p-5 shadow-sm space-y-4 border border-neon-500/30">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-4 h-4 text-neon-500"></i>
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">Model Parameters & Tuning</span>
+                        </div>
+                        <button onclick="toggleChatParametersDrawer()" class="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                        <!-- Target Model Selector in Chat Studio -->
+                        <div>
+                            <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Target Model</label>
+                            <select id="chat-model-select" onchange="onGlobalModelFilterChange(this.value)"
+                                class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
+                            </select>
+                        </div>
+
+                        <!-- System Instruction Preset -->
+                        <div>
+                            <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">System Prompt Preset</label>
+                            <select id="chat-system-preset" onchange="applySystemPromptPreset(this.value)"
+                                class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40">
+                                <option value="general">Preset: General Assistant</option>
+                                <option value="coder">Preset: Senior AI Engineer</option>
+                                <option value="hpc">Preset: HPC & Slurm Expert</option>
+                                <option value="vi">Preset: Bilingual Assistant (EN / VI)</option>
+                                <option value="latex">Preset: LaTeX & Academic</option>
+                            </select>
+                        </div>
+
+                        <!-- Temperature & Top-P -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-bold text-slate-600 dark:text-slate-400">Temperature</span>
+                                <span id="chat-val-temp" class="font-mono text-neon-600 dark:text-neon-400 font-bold">0.70</span>
+                            </div>
+                            <input type="range" id="chat-temp" min="0.0" max="1.5" step="0.05" value="0.70"
+                                oninput="document.getElementById('chat-val-temp').innerText = parseFloat(this.value).toFixed(2); updateChatSettings();"
+                                class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500">
+                        </div>
+
+                        <!-- Max Response Tokens -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-bold text-slate-600 dark:text-slate-400">Max Tokens</span>
+                                <span id="chat-val-tokens" class="font-mono text-neon-600 dark:text-neon-400 font-bold">2048</span>
+                            </div>
+                            <input type="range" id="chat-tokens" min="256" max="8192" step="256" value="2048"
+                                oninput="document.getElementById('chat-val-tokens').innerText = this.value; updateChatSettings();"
+                                class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500">
+                        </div>
+                    </div>
+
+                    <!-- System Prompt Textarea & Hidden Penalties for compatibility -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">System Prompt Instructions</label>
+                        <textarea id="chat-system-prompt" rows="2"
+                            oninput="updateContextWindowMeter()"
+                            placeholder="Enter custom system instructions..."
+                            class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-neon-500/40">You are a helpful, concise, and technically accurate AI assistant running locally on your HPC cluster via AI Local Gateway.</textarea>
+                    </div>
+
+                    <!-- Context Meter & Advanced Settings Row -->
+                    <div class="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="gauge" class="w-3.5 h-3.5 text-neon-500"></i>
+                                <span class="font-bold text-slate-600 dark:text-slate-400">Context Window:</span>
+                                <span id="chat-context-pct" class="font-mono font-bold text-neon-600 dark:text-neon-400">0.0%</span>
+                                <span class="text-slate-400 font-mono text-[11px]">(<span id="chat-context-used">0 tokens</span> / <span id="chat-context-max">32,768 max</span>)</span>
+                            </div>
+                            <div class="w-32 bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="chat-context-bar" class="bg-neon-500 h-full rounded-full transition-all duration-300" style="width: 1%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Top-P and Penalties (preserved DOM elements) -->
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[11px] text-slate-400">Top-P:</span>
+                                <span id="chat-val-topp" class="font-mono text-xs font-bold text-slate-700 dark:text-slate-300">0.90</span>
+                                <input type="range" id="chat-topp" min="0.1" max="1.0" step="0.05" value="0.90"
+                                    oninput="document.getElementById('chat-val-topp').innerText = parseFloat(this.value).toFixed(2); updateChatSettings();"
+                                    class="w-16 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500">
+                            </div>
+                            <input type="hidden" id="chat-presence" value="0.0">
+                            <span id="chat-val-presence" class="hidden">0.00</span>
+                            <input type="hidden" id="chat-frequency" value="0.0">
+                            <span id="chat-val-frequency" class="hidden">0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MAIN CHAT CONTAINER (Full width, Clean & Modern) -->
+                <div class="flex flex-col glass-card rounded-3xl shadow-lg min-h-[620px] overflow-hidden border border-slate-200 dark:border-slate-800">
+                    
+                    <!-- Chat Top Header Bar -->
+                    <div class="p-4 sm:px-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0a0f18] flex items-center justify-between gap-4">
+                        
+                        <div class="flex items-center gap-3">
+                            <div id="chat-model-avatar" class="w-9 h-9 rounded-2xl bg-neon-500 text-slate-950 font-black flex items-center justify-center text-xs shadow-glow-neon-sm uppercase font-mono">
+                                AI
+                            </div>
+                            <div>
                                 <div class="flex items-center gap-2">
-                                    <div class="w-2.5 h-2.5 rounded-full bg-neon-500"></div>
-                                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                                        Inference Ledger & Audit
-                                    </h3>
+                                    <span id="chat-header-model-name" class="font-bold text-sm text-slate-900 dark:text-white font-mono">qwen3.5-9b</span>
+                                    <span id="chat-selected-model-pill" class="px-2 py-0.5 rounded-full bg-neon-50 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30 text-[10px] font-mono font-bold text-neon-700 dark:text-neon-400">
+                                        READY
+                                    </span>
                                 </div>
-                                <div class="flex items-center gap-1 text-[10px] p-0.5 bg-slate-100 dark:bg-[#111827] rounded-lg">
-                                    <button onclick="filterLogs('all')" id="filter-all-btn" class="px-2 py-1 rounded bg-white dark:bg-neon-500 text-neon-800 dark:text-slate-950 font-black shadow-sm">ALL</button>
-                                    <button onclick="filterLogs('200')" id="filter-ok-btn" class="px-2 py-1 rounded text-slate-600 dark:text-slate-400 font-medium">200 OK</button>
-                                    <button onclick="filterLogs('err')" id="filter-err-btn" class="px-2 py-1 rounded text-slate-600 dark:text-slate-400 font-medium">ERRORS</button>
-                                </div>
-                            </div>
-
-                            <!-- Ledger Feed Items -->
-                            <div id="tx-feed-container" class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                                <!-- Populated dynamically by JS -->
-                            </div>
-
-                            <!-- Ledger Footer -->
-                            <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <span class="text-slate-400 text-[11px]" id="page-info-text">Showing recent calls</span>
-                                <button onclick="clearLedger()" class="text-[11px] text-slate-400 hover:text-rose-600 font-bold uppercase transition-colors">Clear</button>
+                                <span id="chat-header-status" class="text-[11px] text-neon-600 dark:text-neon-400 font-semibold flex items-center gap-1.5 mt-0.5">
+                                    <span class="w-1.5 h-1.5 bg-neon-500 rounded-full animate-neon-pulse"></span>
+                                    <span>Inference Ready (Local V100 GPU)</span>
+                                </span>
                             </div>
                         </div>
 
-                        <!-- Compute Node Hardware Specs -->
-                        <div class="glass-card rounded-2xl p-5 shadow-sm space-y-3.5 transition-all">
-                            <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                                <span class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">Node Specifications</span>
-                                <span class="px-2 py-0.5 rounded-full bg-neon-50 dark:bg-neon-500/10 text-neon-700 dark:text-neon-400 border border-neon-200 dark:border-neon-500/30 text-[10px] font-bold">ONLINE</span>
+                        <!-- Header Right Controls -->
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <!-- Tokens Counter Pill -->
+                            <div id="chat-context-pill-header" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#111827] text-[11px] font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
+                                <i data-lucide="layers" class="w-3.5 h-3.5 text-neon-500"></i>
+                                <span id="chat-header-tokens-counter">~0 tok</span>
                             </div>
-                            <div class="grid grid-cols-2 gap-2.5 text-xs font-mono">
-                                <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#111827] border border-slate-200/70 dark:border-slate-800">
-                                    <span class="text-slate-400 block text-[10px] uppercase font-sans font-bold">GPU Accelerator</span>
-                                    <span class="font-bold text-slate-800 dark:text-slate-200">1x Tesla V100 (16G)</span>
+
+                            <!-- Live Speed HUD -->
+                            <div id="chat-live-speed-hud" class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#111827] text-[11px] font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
+                                <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i>
+                                <span><strong id="chat-live-speed" class="text-neon-600 dark:text-neon-400 font-bold">0.0</strong> tok/s</span>
+                            </div>
+
+                            <!-- Toggle Parameters Drawer Button -->
+                            <button onclick="toggleChatParametersDrawer()"
+                                class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111827] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-neon-500 font-bold text-xs flex items-center gap-1.5 border border-slate-200 dark:border-slate-800 transition-all"
+                                title="Adjust Parameters & System Prompt">
+                                <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+                                <span class="hidden sm:inline">Settings</span>
+                            </button>
+
+                            <!-- Export Chat Transcript -->
+                            <button onclick="exportChatTranscript()"
+                                class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111827] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-neon-500 text-xs transition-all border border-slate-200 dark:border-slate-800"
+                                title="Export Markdown Transcript">
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                            </button>
+
+                            <!-- Clear Chat History -->
+                            <button onclick="clearChatHistory()"
+                                class="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 dark:bg-[#111827] dark:hover:bg-rose-950/40 dark:hover:text-rose-300 text-slate-700 dark:text-slate-300 text-xs transition-all border border-slate-200 dark:border-slate-800"
+                                title="Clear Chat History">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages Stream Container -->
+                    <div id="chat-messages-container" class="flex-1 p-6 overflow-y-auto space-y-4 max-h-[580px]">
+                        
+                        <!-- Welcome Bubble -->
+                        <div class="flex items-start gap-3.5">
+                            <div id="chat-welcome-avatar" class="w-8 h-8 rounded-xl bg-neon-500 text-slate-950 font-black flex items-center justify-center text-xs flex-shrink-0 shadow-glow-neon-sm font-mono">
+                                AI
+                            </div>
+                            <div id="chat-welcome-bubble" class="p-4 rounded-2xl bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-3xl w-full shadow-sm markdown-body">
+                                <div class="font-bold text-neon-600 dark:text-neon-400 mb-1 flex items-center gap-1.5">
+                                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                                    <span>AI Local Serving Assistant</span>
                                 </div>
-                                <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#111827] border border-slate-200/70 dark:border-slate-800">
-                                    <span class="text-slate-400 block text-[10px] uppercase font-sans font-bold">Engine Architecture</span>
-                                    <span class="font-bold text-neon-700 dark:text-neon-400">vLLM (SM70 Volta)</span>
-                                </div>
-                                <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#111827] border border-slate-200/70 dark:border-slate-800">
-                                    <span class="text-slate-400 block text-[10px] uppercase font-sans font-bold">Parallelism</span>
-                                    <span class="font-bold text-slate-800 dark:text-slate-200">TP = 1, NUMA 0</span>
-                                </div>
-                                <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#111827] border border-slate-200/70 dark:border-slate-800">
-                                    <span class="text-slate-400 block text-[10px] uppercase font-sans font-bold">Host / Gateway Port</span>
-                                    <span class="font-bold text-slate-800 dark:text-slate-200">127.0.0.1:9000</span>
-                                </div>
+                                <p>Hello! I am your AI assistant served directly from our internal NVIDIA Tesla V100 GPU cluster. Chat directly or click any starter prompt below:</p>
                             </div>
                         </div>
 
+                        <!-- Prompt Starter Chips (Sleek, 1-line Zero-Friction Prompts) -->
+                        <div id="chat-prompt-starters" class="flex flex-wrap gap-2 pl-11 max-w-2xl">
+                            <button type="button" onclick="useStarterPrompt('Benchmark inference performance and explain the latency & memory differences between FP16 and GGUF Q4_K_M on Tesla V100.')"
+                                class="prompt-starter-chip px-3 py-2 rounded-xl bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 hover:border-neon-500/50 hover:bg-neon-50/50 dark:hover:bg-neon-500/10 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 shadow-sm transition-all">
+                                <i data-lucide="zap" class="w-3.5 h-3.5 text-neon-500"></i>
+                                <span>⚡ Speed Benchmark</span>
+                            </button>
+                            <button type="button" onclick="useStarterPrompt('Write a Python script using the standard openai package to stream chat completions from gateway http://localhost:9001/v1.')"
+                                class="prompt-starter-chip px-3 py-2 rounded-xl bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 hover:border-neon-500/50 hover:bg-neon-50/50 dark:hover:bg-neon-500/10 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 shadow-sm transition-all">
+                                <i data-lucide="code" class="w-3.5 h-3.5 text-neon-500"></i>
+                                <span>💻 Python Client Example</span>
+                            </button>
+                            <button type="button" onclick="useStarterPrompt('Draft an optimized sbatch script to launch a vLLM serving engine for Qwen on our Slurm HPC cluster.')"
+                                class="prompt-starter-chip px-3 py-2 rounded-xl bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 hover:border-neon-500/50 hover:bg-neon-50/50 dark:hover:bg-neon-500/10 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 shadow-sm transition-all">
+                                <i data-lucide="layers" class="w-3.5 h-3.5 text-neon-500"></i>
+                                <span>📜 Slurm Sbatch Template</span>
+                            </button>
+                        </div>
+
+                    </div>
+
+                    <!-- Chat Input Box (Auto-resizing & User-Friendly) -->
+                    <div class="p-4 sm:px-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0a0f18] space-y-2">
+                        <div class="relative flex items-end">
+                            <textarea id="chat-user-input" rows="1"
+                                oninput="onChatInputChanged(); autoResizeTextarea(this);"
+                                placeholder="Ask a question or enter prompt... (Press Enter to send, Shift + Enter for new line)"
+                                class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 pr-28 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500 resize-none max-h-36 min-h-[48px]"></textarea>
+
+                            <div class="absolute right-3 bottom-2.5 flex items-center gap-1.5">
+                                <button id="chat-send-btn" onclick="sendChatMessage()"
+                                    class="px-4 py-2 rounded-xl bg-neon-500 hover:bg-neon-400 text-slate-950 font-black text-xs uppercase transition-all shadow-glow-neon flex items-center gap-1.5">
+                                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                    <span>Send</span>
+                                </button>
+                                <button id="chat-stop-btn" onclick="stopChatStreaming()"
+                                    class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase hidden transition-all flex items-center gap-1">
+                                    <i data-lucide="square" class="w-3 h-3"></i>
+                                    <span>Stop</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] text-slate-400 px-1">
+                            <span class="text-slate-400">Shift + Enter for new line • Enter to send</span>
+                            <span id="chat-input-live-tokens" class="font-mono">Input: ~0 tokens</span>
+                        </div>
                     </div>
 
                 </div>
@@ -721,7 +894,7 @@
             </div>
 
             <!-- ========================================================================= -->
-            <!-- VIEW 2: SLURM HPC CLUSTER & JOBS MONITOR                                  -->
+            <!-- VIEW 3: SLURM HPC CLUSTER & JOBS MONITOR (CHỨC NĂNG GIỮ NGUYÊN 100%)       -->
             <!-- ========================================================================= -->
             <div id="view-slurm" class="space-y-6 hidden">
 
@@ -743,7 +916,7 @@
                             <span class="text-xs text-slate-400">Total Nodes</span>
                         </div>
                         <div class="flex gap-2 text-xs font-mono font-bold">
-                            <span class="text-neon-700 dark:text-neon-400" id="slurm-nodes-idle">0 IDLE</span>
+                            <span class="text-neon-600 dark:text-neon-400" id="slurm-nodes-idle">0 IDLE</span>
                             <span class="text-amber-600 dark:text-amber-400" id="slurm-nodes-mixed">3 MIXED</span>
                             <span class="text-rose-600 dark:text-rose-400" id="slurm-nodes-drain">1 DRAIN</span>
                         </div>
@@ -755,7 +928,7 @@
                             <span id="slurm-active-count" class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">0</span>
                             <span class="text-xs text-slate-400">Running</span>
                         </div>
-                        <span class="text-xs text-neon-700 dark:text-neon-400 font-mono font-bold block" id="slurm-active-node-badge">Node: --</span>
+                        <span class="text-xs text-neon-600 dark:text-neon-400 font-mono font-bold block" id="slurm-active-node-badge">Node: --</span>
                     </div>
 
                     <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
@@ -787,7 +960,7 @@
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr class="bg-slate-50 dark:bg-[#06080d] border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[11px]">
+                                <tr class="bg-slate-50 dark:bg-[#05080e] border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[11px]">
                                     <th class="p-3.5 rounded-l-xl">Nodelist</th>
                                     <th class="p-3.5">State</th>
                                     <th class="p-3.5">CPUs (Alloc/Idle/Other/Tot)</th>
@@ -803,40 +976,147 @@
                     </div>
                 </div>
 
-                <!-- Slurm Active Jobs Table Panel -->
-                <div class="glass-card rounded-2xl p-6 shadow-sm space-y-4">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-2.5 h-2.5 rounded-full bg-neon-500"></div>
-                            <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                                Active Slurm Job Queue (squeue)
-                            </h3>
+                <!-- SSH Reverse Tunnel & Forwarding Status Strip -->
+                <div class="glass-card rounded-2xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 text-xs font-mono">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="flex items-center gap-2">
+                                <div class="p-1.5 rounded-lg bg-neon-500/10 text-neon-500 border border-neon-500/30">
+                                    <i data-lucide="network" class="w-4 h-4"></i>
+                                </div>
+                                <span class="font-sans font-bold text-slate-900 dark:text-white uppercase tracking-wider text-xs">SSH Tunnel:</span>
+                                <span id="tunnel-status-badge" class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-500 border border-slate-200 dark:border-slate-700">
+                                    STANDBY
+                                </span>
+                            </div>
+
+                            <span class="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+
+                            <div class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                                <span class="text-slate-400 font-sans">Route:</span>
+                                <span id="tunnel-status-info" class="font-bold text-slate-800 dark:text-slate-200">127.0.0.1:18000 -> Standby</span>
+                            </div>
+
+                            <span class="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-slate-400 font-sans">Upstream:</span>
+                                <span id="tunnel-upstream-badge" class="font-bold text-slate-500">Checking...</span>
+                                <span id="tunnel-latency-badge" class="text-[10px] text-slate-400">--</span>
+                            </div>
+
+                            <span id="tunnel-target-node" class="hidden">Auto-negotiated via Slurm</span>
                         </div>
-                        <div class="flex items-center gap-2.5">
-                            <button onclick="openSubmitJobModal()"
-                                class="px-4 py-2 rounded-xl bg-gradient-to-r from-neon-600 via-neon-500 to-emerald-400 hover:from-neon-500 hover:to-emerald-300 text-slate-950 font-black text-xs uppercase flex items-center gap-2 shadow-sm dark:shadow-glow-neon transition-all">
-                                <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                                <span>Launch Serving Job</span>
+
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button onclick="probeTunnelHealthAction()"
+                                class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111827] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all">
+                                <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+                                <span>Probe</span>
                             </button>
-                            <button onclick="fetchSlurmJobs()"
-                                class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111827] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all">
+                            <button onclick="restartTunnelAction()"
+                                class="px-3 py-1.5 rounded-xl bg-neon-500/15 hover:bg-neon-500/25 text-neon-600 dark:text-neon-400 border border-neon-500/40 font-bold text-xs flex items-center gap-1.5 transition-all shadow-glow-neon-sm">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                <span>Reconnect</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slurm Active Jobs & GPU Queue Table Panel -->
+                <div class="glass-card rounded-2xl p-6 shadow-sm space-y-4">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2.5 h-2.5 rounded-full bg-neon-500"></div>
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                                    Slurm Job & GPU Queue
+                                </h3>
+                            </div>
+
+                            <!-- View Mode Switcher -->
+                            <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-[#05080e] border border-slate-200 dark:border-slate-800 text-xs font-semibold">
+                                <button id="queue-tab-all" onclick="setSlurmQueueMode('all-queue')"
+                                    class="px-3.5 py-1.5 rounded-lg bg-neon-500 text-slate-950 font-black transition-all flex items-center gap-1.5 shadow-glow-neon-sm">
+                                    <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                                    <span>All GPU Queue (squeue)</span>
+                                    <span id="queue-total-badge" class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-950/20 text-[10px] font-mono">0</span>
+                                </button>
+                                <button id="queue-tab-mine" onclick="setSlurmQueueMode('my-jobs')"
+                                    class="px-3.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-1.5">
+                                    <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
+                                    <span>My Serving Jobs</span>
+                                    <span id="queue-mine-badge" class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 text-[10px] font-mono">0</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <!-- Partition selector -->
+                            <div class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                <span class="font-medium">Partition:</span>
+                                <select id="slurm-queue-partition-select" onchange="onSlurmPartitionChange(this.value)"
+                                    class="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-[#05080e] border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-mono text-xs focus:ring-1 focus:ring-neon-500 outline-none">
+                                    <option value="gpu-queue" selected>gpu-queue</option>
+                                    <option value="gpu-v100">gpu-v100</option>
+                                    <option value="all">All Partitions</option>
+                                </select>
+                            </div>
+
+                            <!-- Filter by status -->
+                            <select id="slurm-queue-status-filter" onchange="renderSlurmCurrentQueue()"
+                                class="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-[#05080e] border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-medium text-xs focus:ring-1 focus:ring-neon-500 outline-none">
+                                <option value="all">All Status</option>
+                                <option value="R">Running (R)</option>
+                                <option value="PD">Pending (PD)</option>
+                            </select>
+
+                            <button onclick="openSubmitJobModal()"
+                                class="px-3.5 py-1.5 rounded-xl bg-neon-500 hover:bg-neon-400 text-slate-950 font-black text-xs uppercase flex items-center gap-1.5 shadow-glow-neon-sm transition-all">
+                                <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                                <span>Launch Serving</span>
+                            </button>
+                            <button onclick="refreshSlurmQueueView()"
+                                class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111827] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center transition-all"
+                                title="Refresh Queue">
                                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- Queue summary stats banner -->
+                    <div id="slurm-queue-stats-bar" class="grid grid-cols-2 sm:grid-cols-4 gap-3 py-2.5 px-3.5 rounded-xl bg-slate-50/60 dark:bg-[#080d1a]/60 border border-slate-200/50 dark:border-slate-800/60 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span id="queue-stat-label-scope" class="text-slate-500">Partition:</span>
+                            <span id="queue-stat-partition" class="font-mono font-bold text-neon-600 dark:text-neon-400">gpu-queue</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="queue-stat-label-total" class="text-slate-500">Total Jobs:</span>
+                            <span id="queue-stat-total" class="font-mono font-bold text-slate-900 dark:text-white">0</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="queue-stat-label-running" class="text-slate-500">Running (R):</span>
+                            <span id="queue-stat-running" class="font-mono font-bold text-emerald-600 dark:text-emerald-400">0</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="queue-stat-label-pending" class="text-slate-500">Pending (PD):</span>
+                            <span id="queue-stat-pending" class="font-mono font-bold text-amber-500 dark:text-amber-400">0</span>
                         </div>
                     </div>
 
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr class="bg-slate-50 dark:bg-[#06080d] border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[11px]">
-                                    <th class="p-3.5 rounded-l-xl">Job ID</th>
-                                    <th class="p-3.5">Job Name</th>
-                                    <th class="p-3.5">Partition</th>
-                                    <th class="p-3.5">Allocated Node</th>
-                                    <th class="p-3.5">GRES GPU</th>
-                                    <th class="p-3.5">Time Elapsed</th>
-                                    <th class="p-3.5">State</th>
-                                    <th class="p-3.5 text-right rounded-r-xl">Action</th>
+                                <tr class="bg-slate-50 dark:bg-[#05080e] border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[11px]">
+                                    <th class="p-3 rounded-l-xl">Job ID</th>
+                                    <th class="p-3">Partition</th>
+                                    <th class="p-3">Job Name</th>
+                                    <th class="p-3">User</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3">Runtime</th>
+                                    <th class="p-3">Nodes</th>
+                                    <th class="p-3">Node / Reason</th>
+                                    <th class="p-3 text-right rounded-r-xl">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="slurm-jobs-table-body" class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
@@ -863,7 +1143,7 @@
                                 <input type="checkbox" id="slurm-log-autoscroll" checked class="rounded border-slate-300 accent-neon-500">
                                 <span>Auto-scroll</span>
                             </label>
-                            <button id="btn-toggle-stream-logs" onclick="toggleLiveLogStream()" class="px-3 py-1.5 rounded-lg bg-neon-500 text-slate-950 hover:bg-neon-400 font-black text-xs uppercase flex items-center gap-1.5 transition-all shadow-sm">
+                            <button id="btn-toggle-stream-logs" onclick="toggleLiveLogStream()" class="px-3 py-1.5 rounded-lg bg-neon-500 text-slate-950 hover:bg-neon-400 font-black text-xs uppercase flex items-center gap-1.5 transition-all shadow-glow-neon-sm">
                                 <i data-lucide="radio" class="w-3.5 h-3.5"></i>
                                 <span id="btn-stream-logs-text">Start Live Stream</span>
                             </button>
@@ -877,7 +1157,7 @@
                     </div>
 
                     <div id="slurm-log-terminal"
-                        class="w-full h-80 overflow-y-auto bg-slate-950 dark:bg-[#06080d] text-neon-400 p-4 text-xs font-mono whitespace-pre-wrap rounded-xl border border-slate-800 selection:bg-neon-500 selection:text-slate-950">
+                        class="w-full h-80 overflow-y-auto bg-[#04060a] text-neon-400 p-4 text-xs font-mono whitespace-pre-wrap rounded-xl border border-slate-800 selection:bg-neon-500 selection:text-slate-950">
 [HPC Slurm Monitor] Ready. Click "Start Live Stream" or select an active job to inspect real-time job output via SSE.
                     </div>
                 </div>
@@ -885,257 +1165,45 @@
             </div>
 
             <!-- ========================================================================= -->
-            <!-- VIEW 3: AI CHATBOT WORKSPACE                                              -->
-            <!-- ========================================================================= -->
-            <div id="view-chatbot" class="space-y-6 hidden">
-
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px]">
-
-                    <!-- Left: Chat Controls (4 Cols) -->
-                    <div class="lg:col-span-4 order-2 lg:order-1 space-y-4">
-                        <div class="glass-card rounded-2xl p-5 shadow-sm space-y-4">
-                            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                                <span class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                                    <i data-lucide="sliders" class="w-4 h-4 text-neon-700 dark:text-neon-400"></i>
-                                    Model Parameters
-                                </span>
-                                <span id="chat-selected-model-pill" class="px-2 py-0.5 rounded-full bg-neon-50 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30 text-[10px] font-mono font-bold text-neon-700 dark:text-neon-400">
-                                    --
-                                </span>
-                            </div>
-
-                            <!-- Target Model Selector in Chat Studio -->
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Target Model</label>
-                                <select id="chat-model-select" onchange="onGlobalModelFilterChange(this.value)"
-                                    class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">
-                                </select>
-                            </div>
-
-                            <!-- System Instruction Presets -->
-                            <div>
-                                <div class="flex items-center justify-between mb-1.5">
-                                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">System Prompt</label>
-                                    <select id="chat-system-preset" onchange="applySystemPromptPreset(this.value)"
-                                        class="bg-slate-100 dark:bg-slate-800 text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 rounded-lg px-2 py-0.5 border border-slate-200 dark:border-slate-700 focus:outline-none">
-                                        <option value="general">Preset: General Assistant</option>
-                                        <option value="coder">Preset: Senior AI Engineer</option>
-                                        <option value="hpc">Preset: HPC & Slurm Expert</option>
-                                        <option value="vi">Preset: Trợ lý tiếng Việt</option>
-                                        <option value="latex">Preset: LaTeX & Academic</option>
-                                    </select>
-                                </div>
-                                <textarea id="chat-system-prompt" rows="3"
-                                    oninput="updateContextWindowMeter()"
-                                    placeholder="Enter custom system instructions..."
-                                    class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500">You are a helpful, concise, and technically accurate AI assistant running locally on your HPC cluster via AI Local Gateway.</textarea>
-                            </div>
-
-                            <!-- Context Window Meter in Sidebar -->
-                            <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#111827] border border-slate-200/70 dark:border-slate-800 space-y-1.5">
-                                <div class="flex justify-between items-center text-xs">
-                                    <span class="font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
-                                        <i data-lucide="gauge" class="w-3.5 h-3.5 text-neon-500"></i>
-                                        <span>Context Window</span>
-                                    </span>
-                                    <span id="chat-context-pct" class="font-mono text-xs font-bold text-neon-600 dark:text-neon-400">0.0%</span>
-                                </div>
-                                <div class="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                                    <div id="chat-context-bar" class="bg-gradient-to-r from-neon-500 to-emerald-400 h-full rounded-full transition-all duration-300" style="width: 1%;"></div>
-                                </div>
-                                <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono">
-                                    <span id="chat-context-used">0 tokens</span>
-                                    <span id="chat-context-max">32,768 max</span>
-                                </div>
-                            </div>
-
-                            <!-- Sliders & Advanced Inference Settings -->
-                            <div class="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-                                <div>
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span class="font-bold text-slate-600 dark:text-slate-400">Temperature</span>
-                                        <span id="chat-val-temp" class="font-mono text-neon-700 dark:text-neon-400 font-bold">0.70</span>
-                                    </div>
-                                    <input type="range" id="chat-temp" min="0.0" max="1.5" step="0.05" value="0.70"
-                                        oninput="document.getElementById('chat-val-temp').innerText = parseFloat(this.value).toFixed(2); updateChatSettings();"
-                                        class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500">
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span class="font-bold text-slate-600 dark:text-slate-400">Top-P (Nucleus)</span>
-                                        <span id="chat-val-topp" class="font-mono text-neon-700 dark:text-neon-400 font-bold">0.90</span>
-                                    </div>
-                                    <input type="range" id="chat-topp" min="0.1" max="1.0" step="0.05" value="0.90"
-                                        oninput="document.getElementById('chat-val-topp').innerText = parseFloat(this.value).toFixed(2); updateChatSettings();"
-                                        class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500">
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span class="font-bold text-slate-600 dark:text-slate-400">Max Response Tokens</span>
-                                        <span id="chat-val-tokens" class="font-mono text-neon-700 dark:text-neon-400 font-bold">2048</span>
-                                    </div>
-                                    <input type="range" id="chat-tokens" min="256" max="8192" step="256" value="2048"
-                                        oninput="document.getElementById('chat-val-tokens').innerText = this.value; updateChatSettings();"
-                                        class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500">
-                                </div>
-
-                                <!-- Collapsible Penalties Drawer -->
-                                <details class="group pt-1">
-                                    <summary class="cursor-pointer text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-neon-500 flex items-center justify-between select-none">
-                                        <span>Advanced Penalties</span>
-                                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform group-open:rotate-180"></i>
-                                    </summary>
-                                    <div class="pt-2 space-y-2.5">
-                                        <div>
-                                            <div class="flex justify-between items-center mb-0.5">
-                                                <span class="text-[10px] text-slate-500">Presence Penalty</span>
-                                                <span id="chat-val-presence" class="font-mono text-[10px] text-neon-600 dark:text-neon-400">0.00</span>
-                                            </div>
-                                            <input type="range" id="chat-presence" min="-2.0" max="2.0" step="0.1" value="0.0"
-                                                oninput="document.getElementById('chat-val-presence').innerText = parseFloat(this.value).toFixed(2); updateChatSettings();"
-                                                class="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500">
-                                        </div>
-                                        <div>
-                                            <div class="flex justify-between items-center mb-0.5">
-                                                <span class="text-[10px] text-slate-500">Frequency Penalty</span>
-                                                <span id="chat-val-frequency" class="font-mono text-[10px] text-neon-600 dark:text-neon-400">0.00</span>
-                                            </div>
-                                            <input type="range" id="chat-frequency" min="-2.0" max="2.0" step="0.1" value="0.0"
-                                                oninput="document.getElementById('chat-val-frequency').innerText = parseFloat(this.value).toFixed(2); updateChatSettings();"
-                                                class="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg accent-neon-500">
-                                        </div>
-                                    </div>
-                                </details>
-                            </div>
-
-                            <!-- Actions -->
-                            <div class="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <button onclick="clearChatHistory()"
-                                    class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 dark:bg-[#111827] dark:hover:bg-rose-950/40 dark:hover:text-rose-300 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase flex items-center justify-center gap-1.5 transition-all">
-                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                                    <span>Clear History</span>
-                                </button>
-                                <button onclick="exportChatTranscript()"
-                                    class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111827] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase transition-all"
-                                    title="Export Markdown">
-                                    <i data-lucide="download" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Right: Chat Timeline Stream (8 Cols) -->
-                    <div class="lg:col-span-8 order-1 lg:order-2 flex flex-col glass-card rounded-2xl shadow-sm min-h-[580px] overflow-hidden">
-                        
-                        <!-- Chat Header -->
-                        <div class="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-[#111827]/60 flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div id="chat-model-avatar" class="w-8 h-8 rounded-xl bg-gradient-to-tr from-neon-600 to-emerald-400 text-slate-950 font-black flex items-center justify-center text-xs shadow-sm dark:shadow-glow-neon-sm uppercase font-mono">
-                                    AI
-                                </div>
-                                <div>
-                                    <span id="chat-header-model-name" class="font-bold text-xs text-slate-900 dark:text-white block font-mono">--</span>
-                                    <span id="chat-header-status" class="text-[10px] text-neon-700 dark:text-neon-400 font-bold flex items-center gap-1">
-                                        <span class="w-1.5 h-1.5 bg-neon-500 rounded-full animate-neon-pulse"></span>
-                                        Ready for Inference
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center gap-3">
-                                <div id="chat-context-pill-header" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                    <i data-lucide="layers" class="w-3 h-3 text-neon-500"></i>
-                                    <span id="chat-header-tokens-counter">~0 tok</span>
-                                </div>
-                                <div id="chat-live-speed-hud" class="text-xs font-mono text-slate-500 dark:text-slate-400">
-                                    Speed: <strong id="chat-live-speed" class="text-neon-700 dark:text-neon-400 font-bold">0.0</strong> tok/s
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Chat Messages Container -->
-                        <div id="chat-messages-container" class="flex-1 p-6 overflow-y-auto space-y-4 max-h-[500px]">
-                            <div class="flex items-start gap-3">
-                                <div id="chat-welcome-avatar" class="w-8 h-8 rounded-xl bg-gradient-to-tr from-neon-600 to-emerald-400 text-slate-950 font-black flex items-center justify-center text-xs flex-shrink-0 shadow-sm dark:shadow-glow-neon-sm font-mono">
-                                    AI
-                                </div>
-                                <div id="chat-welcome-bubble" class="p-4 rounded-2xl bg-slate-100/80 dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-w-2xl w-full markdown-body">
-                                    <p>Hello! I am connected to the local AI Gateway. Select a model or enter your prompt below.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Chat Input Box -->
-                        <div class="p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0a0f18] space-y-2">
-                            <div class="relative flex items-center">
-                                <textarea id="chat-user-input" rows="2"
-                                    oninput="onChatInputChanged()"
-                                    placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
-                                    class="w-full bg-slate-50 dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 pr-24 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-neon-500/40 focus:border-neon-500 resize-none"></textarea>
-
-                                <div class="absolute right-3 flex items-center gap-1.5">
-                                    <button id="chat-send-btn" onclick="sendChatMessage()"
-                                        class="px-4 py-2 rounded-xl bg-gradient-to-r from-neon-600 via-neon-500 to-emerald-400 hover:from-neon-500 hover:to-emerald-300 text-slate-950 font-black text-xs uppercase transition-all shadow-sm dark:shadow-glow-neon flex items-center gap-1.5">
-                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                                        <span>Send</span>
-                                    </button>
-                                    <button id="chat-stop-btn" onclick="stopChatStreaming()"
-                                        class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase hidden transition-all">
-                                        Stop
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="flex justify-between items-center text-[10px] text-slate-400">
-                                <span>Markdown & Code Highlighting Enabled</span>
-                                <span id="chat-input-live-tokens" class="font-mono">Input: ~0 tokens</span>
-                            </div>
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-            <!-- ========================================================================= -->
-            <!-- VIEW 4: API KEYS & ACCESS GOVERNANCE                                      -->
+            <!-- VIEW 4: API KEYS & ACCESS GOVERNANCE (CHỨC NĂNG GIỮ NGUYÊN 100%)           -->
             <!-- ========================================================================= -->
             <div id="view-keys" class="space-y-6 hidden">
 
-                <!-- Keys KPI Overview -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
-                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Registered Tokens</span>
+                <!-- Keys Summary Bar -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="glass-card rounded-2xl p-4 shadow-sm space-y-1">
+                        <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Registered Tokens</span>
                         <div class="flex items-baseline gap-1.5">
                             <span id="keys-stat-total" class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">--</span>
-                            <span class="text-xs text-slate-400">in SQLite DB</span>
+                            <span class="text-xs text-slate-400">in Database</span>
                         </div>
-                        <span class="text-xs text-neon-700 dark:text-neon-400 font-mono font-bold block">Database Connected</span>
                     </div>
 
-                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
-                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Active Keys</span>
+                    <div class="glass-card rounded-2xl p-4 shadow-sm space-y-1">
+                        <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Active Keys</span>
                         <div class="flex items-baseline gap-1.5">
-                            <span id="keys-stat-active" class="text-2xl font-extrabold text-neon-700 dark:text-neon-400 font-mono">--</span>
+                            <span id="keys-stat-active" class="text-2xl font-extrabold text-neon-600 dark:text-neon-400 font-mono">--</span>
                             <span class="text-xs text-slate-400">enabled</span>
                         </div>
-                        <span class="text-xs text-slate-400 font-mono block">SHA-256 Hashed Storage</span>
                     </div>
 
-                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
-                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Rate Limiting</span>
-                        <div class="flex items-baseline gap-1.5">
-                            <span class="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">PER-KEY</span>
-                        </div>
-                        <span class="text-xs text-slate-400 font-mono block">Sliding Window (Default 60 RPM)</span>
-                    </div>
-
-                    <div class="glass-card rounded-2xl p-5 shadow-sm space-y-2">
-                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Active Session Key</span>
+                    <div class="glass-card rounded-2xl p-4 shadow-sm space-y-1">
+                        <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Active Session Token</span>
                         <div class="flex items-baseline gap-1.5">
                             <span id="keys-active-prefix-banner" class="text-base font-extrabold text-slate-900 dark:text-white truncate font-mono">sk-hpc-auto...</span>
                         </div>
-                        <span class="text-xs text-neon-700 dark:text-neon-400 font-mono block">Target: /v1/chat/completions</span>
+                    </div>
+                </div>
+
+                <!-- Viewer Read-Only Notice Banner -->
+                <div id="viewer-readonly-notice"
+                    class="hidden p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-3 shadow-sm">
+                    <div class="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <i data-lucide="shield-alert" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <span class="font-bold uppercase tracking-wider block text-[10px]">Read-Only Access Mode</span>
+                        <span>You are logged in as a <strong>Viewer</strong>. You can inspect active telemetry, query AI models, and view registered API keys. Generating or revoking API keys and Slurm HPC job supervision require <strong>Administrator</strong> credentials.</span>
                     </div>
                 </div>
 
@@ -1143,11 +1211,11 @@
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
                     <!-- Left: Issue Token Form (5 Cols) -->
-                    <div class="lg:col-span-5 space-y-4">
+                    <div class="lg:col-span-5 space-y-4" data-admin-only="true">
                         <div class="glass-card rounded-2xl p-6 shadow-sm space-y-4">
                             <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                                 <h2 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                                    <i data-lucide="plus-circle" class="w-4 h-4 text-neon-700 dark:text-neon-400"></i>
+                                    <i data-lucide="plus-circle" class="w-4 h-4 text-neon-600 dark:text-neon-400"></i>
                                     Issue New API Token
                                 </h2>
                                 <span class="text-[10px] text-neon-700 dark:text-neon-400 font-bold bg-neon-50 dark:bg-neon-500/10 px-2 py-0.5 rounded-full border border-neon-200 dark:border-neon-500/30">
@@ -1190,7 +1258,7 @@
                                 </div>
 
                                 <button onclick="createKeyFromPage()"
-                                    class="w-full py-3 bg-gradient-to-r from-neon-600 via-neon-500 to-emerald-400 hover:from-neon-500 hover:to-emerald-300 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md dark:shadow-glow-neon flex items-center justify-center gap-2">
+                                    class="w-full py-3 bg-neon-500 hover:bg-neon-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-glow-neon flex items-center justify-center gap-2">
                                     <i data-lucide="key" class="w-4 h-4"></i>
                                     <span>Generate & Issue Key</span>
                                 </button>
@@ -1203,7 +1271,7 @@
                                     <i data-lucide="check" class="w-3.5 h-3.5 text-neon-600 dark:text-neon-400"></i>
                                     <span>API Key Issued (Save This Secret Now):</span>
                                 </div>
-                                <div class="p-2.5 bg-white dark:bg-[#06080d] border border-neon-200 dark:border-neon-500/30 rounded-lg font-mono text-xs text-neon-700 dark:text-neon-400 break-all select-all shadow-inner"
+                                <div class="p-2.5 bg-white dark:bg-[#05080e] border border-neon-200 dark:border-neon-500/30 rounded-lg font-mono text-xs text-neon-600 dark:text-neon-400 break-all select-all shadow-inner"
                                     id="page-issued-key-val"></div>
                                 <div class="flex gap-2 pt-1">
                                     <button onclick="copyGeneratedKey()"
@@ -1215,17 +1283,17 @@
                                         Use in Session
                                     </button>
                                 </div>
-                                <span class="text-[10px] text-slate-400 block leading-tight">Stored as SHA-256 hash in gateway.db. Raw secret cannot be retrieved again.</span>
+                                <span class="text-[10px] text-slate-400 block leading-tight">Stored as SHA-256 hash in database. Raw secret cannot be retrieved again.</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Right: Registered Keys Table (7 Cols) -->
-                    <div class="lg:col-span-7 space-y-4">
+                    <div id="keys-table-column" class="lg:col-span-7 space-y-4">
                         <div class="glass-card rounded-2xl p-6 shadow-sm space-y-4 min-h-[480px]">
                             <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                                 <h2 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                                    <i data-lucide="shield-check" class="w-4 h-4 text-neon-700 dark:text-neon-400"></i>
+                                    <i data-lucide="shield-check" class="w-4 h-4 text-neon-600 dark:text-neon-400"></i>
                                     Registered API Keys Registry
                                 </h2>
                                 <button onclick="fetchKeysManagement()"
@@ -1238,7 +1306,7 @@
                             <div class="overflow-x-auto">
                                 <table class="w-full text-left text-xs border-collapse">
                                     <thead>
-                                        <tr class="bg-slate-50 dark:bg-[#06080d] border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">
+                                        <tr class="bg-slate-50 dark:bg-[#05080e] border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">
                                             <th class="p-3 rounded-l-lg">Prefix</th>
                                             <th class="p-3">Client Name</th>
                                             <th class="p-3">Models</th>
@@ -1267,10 +1335,10 @@
     <div id="modal-submit-job"
         class="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
         <div
-            class="bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-4 transition-all">
+            class="bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl p-6 space-y-4 transition-all">
             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div class="flex items-center gap-2.5">
-                    <i data-lucide="play-circle" class="w-5 h-5 text-neon-700 dark:text-neon-400"></i>
+                    <i data-lucide="play-circle" class="w-5 h-5 text-neon-600 dark:text-neon-400"></i>
                     <h3 class="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
                         Launch Slurm Serving Job (sbatch)
                     </h3>
@@ -1322,7 +1390,7 @@
                 </div>
 
                 <div id="submit-job-script-preview" class="p-3 rounded-xl bg-neon-50 dark:bg-neon-500/10 border border-neon-200 dark:border-neon-500/30 text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
-                    <strong class="text-neon-800 dark:text-neon-400 font-bold">Execution Script:</strong>
+                    <strong class="text-neon-700 dark:text-neon-400 font-bold">Execution Script:</strong>
                     <code id="submit-job-script-code">infra/llama-cpp/run_qwen_server.sbatch</code><br>
                     <span id="submit-job-script-desc">llama.cpp CUDA server on V100 GPU with automatic reverse SSH tunnel.</span>
                 </div>
@@ -1334,7 +1402,7 @@
                     Cancel
                 </button>
                 <button onclick="submitSlurmJobAction()"
-                    class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-neon-600 via-neon-500 to-emerald-400 hover:from-neon-500 hover:to-emerald-300 text-slate-950 font-black uppercase text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
+                    class="flex-1 py-2.5 rounded-xl bg-neon-500 hover:bg-neon-400 text-slate-950 font-black uppercase text-xs flex items-center justify-center gap-1.5 shadow-glow-neon-sm transition-all">
                     <i data-lucide="check" class="w-4 h-4"></i>
                     <span>Submit Sbatch</span>
                 </button>
@@ -1346,10 +1414,10 @@
     <div id="modal-view-key"
         class="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
         <div
-            class="bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-4 transition-all">
+            class="bg-white dark:bg-[#0a0f18] border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl p-6 space-y-4 transition-all">
             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div class="flex items-center gap-2.5">
-                    <i data-lucide="key" class="w-5 h-5 text-neon-700 dark:text-neon-400"></i>
+                    <i data-lucide="key" class="w-5 h-5 text-neon-600 dark:text-neon-400"></i>
                     <h3 class="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white" id="modal-key-title">
                         API Key Details & Credentials
                     </h3>
@@ -1383,7 +1451,7 @@
                 <div>
                     <label class="block font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Quick cURL Command</label>
                     <div class="relative">
-                        <pre id="modal-key-curl" class="p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-[10px] overflow-x-auto whitespace-pre leading-relaxed select-all"></pre>
+                        <pre id="modal-key-curl" class="p-3 rounded-xl bg-[#04060a] text-neon-400 font-mono text-[10px] overflow-x-auto whitespace-pre leading-relaxed select-all"></pre>
                     </div>
                 </div>
             </div>
@@ -1403,20 +1471,23 @@
     <!-- ========================================================================= -->
     <!-- 3. JAVASCRIPT CONTROLLER MODULES                                          -->
     <!-- ========================================================================= -->
-    <script src="js/app.js?v=3.1.0"></script>
-    <script src="js/auth.js?v=3.1.0"></script>
-    <script src="js/telemetry.js?v=3.1.0"></script>
-    <script src="js/slurm.js?v=3.1.0"></script>
-    <script src="js/keys.js?v=3.1.0"></script>
-    <script src="js/chatbot.js?v=3.1.0"></script>
+    <script src="js/rbac.js?v=3.5.0"></script>
+    <script src="js/app.js?v=3.5.0"></script>
+    <script src="js/auth.js?v=3.5.0"></script>
+    <script src="js/telemetry.js?v=3.5.0"></script>
+    <script src="js/slurm.js?v=3.5.0"></script>
+    <script src="js/keys.js?v=3.5.0"></script>
+    <script src="js/chatbot.js?v=3.5.0"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             updateThemeIcons();
             checkAdminAuth();
+            if (typeof initRealtimeSSE === 'function') initRealtimeSSE();
             if (typeof fetchRealtimeMetrics === 'function') fetchRealtimeMetrics();
             if (typeof fetchTimeseriesMetrics === 'function') fetchTimeseriesMetrics();
             if (typeof fetchAvailableModels === 'function') fetchAvailableModels();
             if (typeof fetchApiKeys === 'function') fetchApiKeys();
+            if (typeof fetchMetricsLogs === 'function') fetchMetricsLogs();
             if (window.lucide) lucide.createIcons();
 
             syncIntervals.push(setInterval(() => {
