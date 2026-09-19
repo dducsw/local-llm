@@ -1,6 +1,6 @@
 import secrets
 import time
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 
 from app.config import (
     ADMIN_PASSWORD,
@@ -10,13 +10,14 @@ from app.config import (
     VIEWER_USERNAME,
 )
 from app.state import ADMIN_SESSIONS, LOGIN_ATTEMPTS, LOGIN_LOCK
+from app.database import delete_session, get_session, save_session
 from app.schemas import LoginRequest
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 
 @router.post("/login")
-def login(body: LoginRequest, request: Request):
+def login(body: LoginRequest, request: Request, response: Response):
     ip = request.client.host if request.client else "unknown"
     now = time.time()
 
@@ -54,11 +55,22 @@ def login(body: LoginRequest, request: Request):
         )
 
     session_token = "sess_" + secrets.token_urlsafe(32)
+    expires_at = time.time() + 86400 * 7
     ADMIN_SESSIONS[session_token] = {
-        "expires_at": time.time() + 86400 * 7,
+        "expires_at": expires_at,
         "username": body.username,
         "role": role,
     }
+    save_session(session_token, body.username, role, expires_at)
+
+    response.set_cookie(
+        key="hpc_admin_session",
+        value=session_token,
+        max_age=86400 * 7,
+        httponly=False,
+        samesite="lax",
+        path="/",
+    )
 
     return {
         "status": "ok",
@@ -71,37 +83,39 @@ def login(body: LoginRequest, request: Request):
 
 @router.post("/logout")
 def logout(
+    response: Response,
     x_admin_session: str | None = Header(default=None),
     x_admin_token: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
 ):
-    token = x_admin_session or x_admin_token
-    if not token and authorization and authorization.lower().startswith("bearer "):
-        token = authorization.split(" ", 1)[1].strip()
+    from app.services.auth_service import _extract_token
+    token = _extract_token(x_admin_token, x_admin_session, authorization)
 
-    if token and token in ADMIN_SESSIONS:
+    if token:
         ADMIN_SESSIONS.pop(token, None)
+        delete_session(token)
+    response.delete_cookie(key="hpc_admin_session", path="/")
     return {"status": "logged_out"}
 
 
 @router.get("/me")
 def auth_me(
+    request: Request,
     x_admin_session: str | None = Header(default=None),
     x_admin_token: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
 ):
-    token = x_admin_session or x_admin_token
-    if not token and authorization and authorization.lower().startswith("bearer "):
-        token = authorization.split(" ", 1)[1].strip()
+    from app.services.auth_service import _get_active_session, _extract_token
+
+    cookie_token = request.cookies.get("hpc_admin_session") or request.cookies.get("admin_session")
+    token = _extract_token(x_admin_token, x_admin_session, authorization, cookie=cookie_token)
 
     if token:
-        if token in ADMIN_SESSIONS:
-            sess = ADMIN_SESSIONS[token]
-            exp = sess["expires_at"] if isinstance(sess, dict) else sess
-            uname = sess.get("username", "user") if isinstance(sess, dict) else "user"
-            role = sess.get("role", "admin") if isinstance(sess, dict) else "admin"
-            if time.time() < exp:
-                return {"authenticated": True, "username": uname, "role": role}
+        sess = _get_active_session(token)
+        if sess:
+            uname = sess.get("username", "user")
+            role = sess.get("role", "admin")
+            return {"authenticated": True, "username": uname, "role": role}
 
         if (ADMIN_PASSWORD and secrets.compare_digest(token, ADMIN_PASSWORD)) or (
             ADMIN_TOKEN and secrets.compare_digest(token, ADMIN_TOKEN)

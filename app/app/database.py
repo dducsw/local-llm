@@ -168,6 +168,17 @@ def init_db() -> None:
                     );
                     """
                 )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS admin_sessions (
+                        token VARCHAR(128) PRIMARY KEY,
+                        username VARCHAR(64) NOT NULL,
+                        role VARCHAR(32) NOT NULL,
+                        expires_at DOUBLE PRECISION NOT NULL
+                    );
+                    """
+                )
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON admin_sessions(expires_at);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_created_at ON inference_logs(created_at DESC);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_created_at_model ON inference_logs(created_at, model);")
                 conn.commit()
@@ -212,6 +223,17 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_sessions (
+                token TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                role TEXT NOT NULL,
+                expires_at REAL NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON admin_sessions(expires_at);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_created_at ON inference_logs(created_at DESC);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_logs_created_at_model ON inference_logs(created_at, model);")
         conn.commit()
@@ -344,3 +366,64 @@ async def telemetry_flush_worker():
         except Exception as exc:
             log.debug("Telemetry worker loop exception: %s", exc)
             await asyncio.sleep(1.0)
+
+
+def save_session(token: str, username: str, role: str, expires_at: float) -> None:
+    """Persist an authenticated user/admin session to database."""
+    try:
+        with db() as conn:
+            conn.execute(
+                """
+                INSERT INTO admin_sessions (token, username, role, expires_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(token) DO UPDATE SET
+                    username = excluded.username,
+                    role = excluded.role,
+                    expires_at = excluded.expires_at;
+                """,
+                (token, username, role, expires_at),
+            )
+            conn.commit()
+    except Exception as exc:
+        log.warning("Failed to persist session to database: %s", exc)
+
+
+def get_session(token: str) -> dict[str, Any] | None:
+    """Retrieve session from database if exists and not expired."""
+    try:
+        now = time.time()
+        with db() as conn:
+            cur = conn.execute(
+                "SELECT token, username, role, expires_at FROM admin_sessions WHERE token = ?;",
+                (token,),
+            )
+            row = cur.fetchone()
+            if row:
+                if isinstance(row, dict):
+                    data = row
+                else:
+                    data = {
+                        "token": row[0],
+                        "username": row[1],
+                        "role": row[2],
+                        "expires_at": float(row[3]),
+                    }
+                if data["expires_at"] > now:
+                    return data
+                else:
+                    # Clean expired session asynchronously or inline
+                    delete_session(token)
+    except Exception as exc:
+        log.debug("Database session lookup error: %s", exc)
+    return None
+
+
+def delete_session(token: str) -> None:
+    """Remove session from database upon logout or expiration."""
+    try:
+        with db() as conn:
+            conn.execute("DELETE FROM admin_sessions WHERE token = ?;", (token,))
+            conn.commit()
+    except Exception as exc:
+        log.debug("Database delete session error: %s", exc)
+

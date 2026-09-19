@@ -2,6 +2,10 @@
 // SLURM & SSH TUNNEL SUPERVISION
 // ==============================================================================
 
+function getActiveHpcUser() {
+    return localStorage.getItem('hpc_admin_username') || sessionStorage.getItem('hpc_admin_username') || 'user';
+}
+
 async function fetchSlurmNodes() {
     try {
         const res = await fetch(`${GATEWAY_BASE}/api/slurm/nodes`, {
@@ -141,7 +145,7 @@ function setSlurmQueueMode(mode) {
         if (labelTotal) labelTotal.innerText = 'Serving Jobs:';
         if (labelRunning) labelRunning.innerText = 'Running (R):';
         if (labelPending) labelPending.innerText = 'Pending (PD):';
-        if (statScope) statScope.innerText = 'ducledinh';
+        if (statScope) statScope.innerText = getActiveHpcUser();
         if (statTotal) statTotal.innerText = cachedMyJobsData.length;
         if (statRunning) statRunning.innerText = cachedMyJobsData.filter(j => (j.status || '').toUpperCase() === 'RUNNING').length;
         if (statPending) statPending.innerText = cachedMyJobsData.filter(j => (j.status || '').toUpperCase() === 'PENDING').length;
@@ -236,7 +240,7 @@ async function fetchSlurmJobs() {
             const statPending = document.getElementById('queue-stat-pending');
             const statScope = document.getElementById('queue-stat-partition');
 
-            if (statScope) statScope.innerText = 'ducledinh';
+            if (statScope) statScope.innerText = getActiveHpcUser();
             if (statTotal) statTotal.innerText = jobs.length;
             if (statRunning) statRunning.innerText = runningJobs.length;
             if (statPending) statPending.innerText = jobs.filter(j => (j.status || '').toUpperCase() === 'PENDING').length;
@@ -303,7 +307,7 @@ function renderSlurmCurrentQueue() {
                                 <i data-lucide="cpu" class="w-6 h-6"></i>
                             </div>
                             <div class="space-y-0.5">
-                                <span class="text-xs font-bold text-slate-900 dark:text-white block">No Active Serving Jobs for ducledinh</span>
+                                <span class="text-xs font-bold text-slate-900 dark:text-white block">No Active Serving Jobs for ${getActiveHpcUser()}</span>
                                 <span class="text-[11px] text-slate-500 block">You currently have no active LLM serving processes running in Slurm.</span>
                             </div>
                             <div class="flex items-center gap-2 pt-1.5">
@@ -346,8 +350,9 @@ function renderSlurmCurrentQueue() {
             stateLabel = 'FAILED/CANCEL';
         }
 
-        const username = j.user || 'ducledinh';
-        const isMe = (username.toLowerCase().includes('ducledin') || username.toLowerCase() === 'user');
+        const currentUser = getActiveHpcUser().toLowerCase();
+        const username = j.user || currentUser;
+        const isMe = (username.toLowerCase() === currentUser || username.toLowerCase() === 'user');
         const userBadge = isMe
             ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] bg-neon-500/15 text-neon-400 border border-neon-500/30">
                  <span class="w-1.5 h-1.5 rounded-full bg-neon-500 animate-pulse"></span>${username} (You)
@@ -614,7 +619,16 @@ async function inspectSlurmJobLog(jobId) {
     const logTitle = document.getElementById('slurm-log-title');
     const logContent = document.getElementById('slurm-log-terminal');
     if (logTitle) logTitle.innerText = `Live Slurm Job Logs - Job #${jobId}`;
-    if (logContent) logContent.innerText = `[SSE Stream] Connecting to job #${jobId}...`;
+    if (logContent) logContent.innerText = `[Job #${jobId}] Fetching latest log output...`;
+
+    // Smooth scroll down to the log terminal console
+    if (logContent) {
+        const terminalCard = logContent.closest('.glass-card') || logContent;
+        terminalCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Immediately fetch existing log content via REST API
+    refreshSlurmLogs(false);
 
     // Automatically initiate live streaming on select
     startLiveLogStream(jobId);
@@ -644,20 +658,20 @@ function startLiveLogStream(jobId) {
     if (btn) btn.className = 'px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase flex items-center gap-1.5 transition-all shadow-sm';
 
     try {
-        liveLogEventSource = new EventSource(`${GATEWAY_BASE}/api/slurm/logs/${id}/stream`);
+        const session = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || (typeof adminToken !== 'undefined' ? adminToken : '') || '';
+        const tokenQuery = session ? `?token=${encodeURIComponent(session)}` : '';
+        liveLogEventSource = new EventSource(`${GATEWAY_BASE}/api/slurm/logs/${id}/stream${tokenQuery}`);
 
         liveLogEventSource.onmessage = function (event) {
             if (!event.data) return;
             try {
                 const data = JSON.parse(event.data);
-                if (data.log || data.stderr) {
-                    const text = data.log || (data.stderr ? `[stderr]\n${data.stderr}` : '');
-                    if (logContent) {
-                        logContent.innerText = text || '(no output received yet)';
-                        const autoscroll = document.getElementById('slurm-log-autoscroll');
-                        if (autoscroll && autoscroll.checked) {
-                            logContent.scrollTop = logContent.scrollHeight;
-                        }
+                const text = data.log || data.stdout || data.stderr;
+                if (text && logContent) {
+                    logContent.innerText = text;
+                    const autoscroll = document.getElementById('slurm-log-autoscroll');
+                    if (autoscroll && autoscroll.checked) {
+                        logContent.scrollTop = logContent.scrollHeight;
                     }
                 }
             } catch (e) {}
@@ -668,6 +682,8 @@ function startLiveLogStream(jobId) {
                 badge.innerText = 'RECONNECTING';
                 badge.className = 'px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold border border-amber-200';
             }
+            // Fallback: refresh once via normal authenticated fetch
+            refreshSlurmLogs(false);
         };
     } catch (err) {
         showToast('Failed to connect SSE stream', 'error');
@@ -713,7 +729,7 @@ function clearSlurmLogTerminal() {
     showToast('Log viewer cleared', 'info');
 }
 
-async function refreshSlurmLogs() {
+async function refreshSlurmLogs(showToastMsg = true) {
     const logContent = document.getElementById('slurm-log-terminal');
     if (!logContent) return;
 
@@ -734,11 +750,13 @@ async function refreshSlurmLogs() {
             headers: getAdminHeaders()
         });
         const data = await res.json();
-        const stdout = data.stdout || data.log || '';
-        const stderr = data.stderr || '';
-        logContent.innerText = `[stdout]\n${stdout || '(empty)'}\n\n[stderr]\n${stderr || '(empty)'}`;
-        logContent.scrollTop = logContent.scrollHeight;
-        showToast('Logs refreshed', 'info');
+        const text = data.log || (data.stdout && data.stderr ? `=== STDOUT ===\n${data.stdout}\n\n=== STDERR ===\n${data.stderr}` : (data.stdout || data.stderr || ''));
+        logContent.innerText = text || '(no output received yet)';
+        const autoscroll = document.getElementById('slurm-log-autoscroll');
+        if (autoscroll && autoscroll.checked) {
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        if (showToastMsg) showToast('Logs refreshed', 'info');
     } catch (err) {
         logContent.innerText = 'Failed to load log file from server.';
     }

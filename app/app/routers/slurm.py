@@ -6,22 +6,24 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.config import (
+    DEFAULT_SLURM_PARTITION,
     HPC_REMOTE_DIR,
     HPC_LOG_DIR,
     HPC_SLURM_ACCOUNT,
     HPC_SSH_HOST,
     HPC_SSH_USER,
     ROOT_DIR,
+    SLURM_PARTITIONS_CONFIG,
 )
 from app.state import ACTIVE_SLURM_JOBS, SLURM_JOBS_LOCK
 from app.schemas import StartTunnelRequest, SubmitJobRequest
-from app.services.auth_service import require_admin
+from app.services.auth_service import require_admin, require_viewer_or_admin
 from app.services.slurm_service import get_cluster_status, run_slurm_cli, run_slurm_cli_async
 from app.services.tunnel_service import TUNNEL_MANAGER, watch_and_tunnel_job
 
 router = APIRouter(
     prefix="/api/slurm",
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_viewer_or_admin)],
     tags=["Slurm & Compute"],
 )
 
@@ -38,7 +40,7 @@ async def get_tunnel_status():
     return TUNNEL_MANAGER.get_info()
 
 
-@router.post("/tunnel/start")
+@router.post("/tunnel/start", dependencies=[Depends(require_admin)])
 async def start_tunnel_manual(body: StartTunnelRequest):
     """Manually start or re-route SSH tunnel to a specific compute node."""
     ok = TUNNEL_MANAGER.start(
@@ -54,14 +56,14 @@ async def start_tunnel_manual(body: StartTunnelRequest):
     return {"status": "running", "tunnel": TUNNEL_MANAGER.get_info()}
 
 
-@router.post("/tunnel/stop")
+@router.post("/tunnel/stop", dependencies=[Depends(require_admin)])
 async def stop_tunnel_manual():
     """Manually terminate the background SSH tunnel."""
     TUNNEL_MANAGER.stop()
     return {"status": "stopped", "tunnel": TUNNEL_MANAGER.get_info()}
 
 
-@router.post("/tunnel/restart")
+@router.post("/tunnel/restart", dependencies=[Depends(require_admin)])
 async def restart_tunnel_manual():
     """Manually cycle and restart the background SSH tunnel."""
     ok = TUNNEL_MANAGER.restart()
@@ -72,7 +74,7 @@ async def restart_tunnel_manual():
 async def get_slurm_nodes():
     """Return cluster node states via sinfo (NODELIST, STATE, CPUS, MEMORY, GRES, PARTITION)."""
     code, stdout, _ = await run_slurm_cli_async(
-        ["sinfo", "-N", "-p", "gpu-v100,gpu-queue", "-o", "%N|%T|%C|%m|%G|%P", "--noheader"]
+        ["sinfo", "-N", "-p", SLURM_PARTITIONS_CONFIG, "-o", "%N|%T|%C|%m|%G|%P", "--noheader"]
     )
     if code != 0:
         code, stdout, _ = await run_slurm_cli_async(
@@ -144,7 +146,7 @@ async def get_slurm_jobs(all_users: bool = False, partition: str | None = None):
 
 
 @router.get("/queue")
-async def get_slurm_gpu_queue(partition: str = "gpu-queue"):
+async def get_slurm_gpu_queue(partition: str = DEFAULT_SLURM_PARTITION):
     """Return live squeue output for specified partition across all users (e.g. squeue -p gpu-queue)."""
     cmd = ["squeue"]
     if partition and partition != "all":
@@ -181,7 +183,7 @@ async def get_slurm_gpu_queue(partition: str = "gpu-queue"):
     }
 
 
-@router.post("/jobs/submit")
+@router.post("/jobs/submit", dependencies=[Depends(require_admin)])
 async def submit_slurm_job(body: SubmitJobRequest):
     """Submit new serving sbatch job (llama.cpp, 1Cat-vLLM, or standard vLLM) on Slurm cluster and auto-connect SSH tunnel."""
     model_str = (body.model or "").lower()
@@ -199,8 +201,8 @@ async def submit_slurm_job(body: SubmitJobRequest):
     time_limit = body.time_limit.strip() if body.time_limit else "01:00:00"
 
     # Resolve remote directories and ensure logs folder exists
-    remote_work_dir = HPC_REMOTE_DIR or "/home/ducledinh/dev/local-llm/infra"
-    remote_log_dir = f"{remote_work_dir}/logs"
+    remote_work_dir = HPC_REMOTE_DIR
+    remote_log_dir = HPC_LOG_DIR or f"{remote_work_dir}/logs"
 
     submit_cmd = [
         "sbatch",
@@ -211,7 +213,7 @@ async def submit_slurm_job(body: SubmitJobRequest):
     ]
     if body.gres and body.gres.strip():
         submit_cmd.append(f"--gres={body.gres.strip()}")
-    if body.partition == "gpu-queue":
+    if body.partition == DEFAULT_SLURM_PARTITION:
         submit_cmd.append("--qos=gpu-q")
     if HPC_SLURM_ACCOUNT:
         submit_cmd.append(f"--account={HPC_SLURM_ACCOUNT}")
@@ -219,10 +221,9 @@ async def submit_slurm_job(body: SubmitJobRequest):
 
     # If running on VM via SSH:
     if HPC_SSH_HOST:
-        # Crucial: Automatically create all required logs directories if missing on the remote cluster
         ensure_logs_cmd = [
             "bash", "-c",
-            f"mkdir -p '{remote_log_dir}' '{remote_work_dir}/logs' /home/ducledinh/dev/local-llm/logs '{remote_work_dir}/llama-cpp/logs'"
+            f"mkdir -p '{remote_log_dir}' '{remote_work_dir}/logs' '{remote_work_dir}/llama-cpp/logs'"
         ]
         await run_slurm_cli_async(ensure_logs_cmd, timeout=5.0, use_cache=False)
 
@@ -296,7 +297,7 @@ async def submit_slurm_job(body: SubmitJobRequest):
     }
 
 
-@router.post("/jobs/{job_id}/cancel")
+@router.post("/jobs/{job_id}/cancel", dependencies=[Depends(require_admin)])
 async def cancel_slurm_job(job_id: str):
     """Cancel a running Slurm job via scancel and cleanup tunnel."""
     code, stdout, stderr = await run_slurm_cli_async(["scancel", job_id], use_cache=False)
@@ -320,34 +321,34 @@ async def cancel_slurm_job(job_id: str):
 
 @router.get("/logs/{job_id}")
 async def get_slurm_job_log(job_id: str):
-    """Read standard output log for a given Slurm job ID (locally or via SSH)."""
+    """Read standard output and error logs for a given Slurm job ID (locally or via SSH)."""
     if not job_id.isdigit() and not job_id.startswith("mock_"):
         raise HTTPException(status_code=400, detail="Invalid Slurm job ID")
 
     if job_id.startswith("mock_"):
         return {
             "job_id": job_id,
+            "stdout": f"Mock Slurm job {job_id} is running simulated inference workload.",
+            "stderr": "",
             "log": f"Mock Slurm job {job_id} is running simulated inference workload.",
         }
 
-    async def tail_remote(path: str, lines: int = 200) -> str:
-        code, content, _ = await run_slurm_cli_async(
-            ["tail", "-n", str(lines), path], use_cache=False, remote_only=True
-        )
-        return content if code == 0 else ""
+    def combine_output(stdout_str: str, stderr_str: str) -> str:
+        s_out = (stdout_str or "").strip()
+        s_err = (stderr_str or "").strip()
+        if s_out and s_err:
+            if s_out == s_err:
+                return s_out
+            return f"=== STDOUT ===\n{s_out}\n\n=== STDERR ===\n{s_err}"
+        return s_out or s_err or ""
 
-    remote_log_paths = [
-        f"{HPC_LOG_DIR}/qwen3.5-server-{job_id}.out",
-        f"{HPC_LOG_DIR}/qwen3.5-server-{job_id}.err",
-        f"{HPC_LOG_DIR}/vllm-{job_id}.out",
-        f"{HPC_LOG_DIR}/vllm-{job_id}.err",
-    ]
-    if HPC_SSH_HOST:
-        stdout_log = await tail_remote(remote_log_paths[0])
-        stderr_log = await tail_remote(remote_log_paths[1])
-        if stdout_log or stderr_log:
-            return {"job_id": job_id, "stdout": stdout_log, "stderr": stderr_log, "log": stdout_log}
+    stdout_log = ""
+    stderr_log = ""
+    job_state = ""
+    job_user = ""
+    job_reason = ""
 
+    # 1. Query job details via scontrol to locate exact StdOut and StdErr paths
     code, job_info, _ = await run_slurm_cli_async(
         ["scontrol", "show", "job", "-o", job_id],
         use_cache=False,
@@ -359,45 +360,123 @@ async def get_slurm_job_log(job_id: str):
             for field in job_info.strip().split()
             if "=" in field
         )
+        job_state = fields.get("JobState", "")
+        job_user = fields.get("UserId", "").split("(")[0]
+        job_reason = fields.get("Reason", "")
         stdout_path = fields.get("StdOut")
-        work_dir = fields.get("WorkDir")
-        if stdout_path:
+        stderr_path = fields.get("StdErr")
+        work_dir = fields.get("WorkDir", "")
+
+        if stdout_path and stdout_path != "/dev/null":
             if not stdout_path.startswith("/") and work_dir:
                 stdout_path = f"{work_dir.rstrip('/')}/{stdout_path}"
-            log_code, stdout, _ = await run_slurm_cli_async(
+            t_code, t_out, t_err = await run_slurm_cli_async(
                 ["tail", "-n", "200", stdout_path],
                 use_cache=False,
                 remote_only=bool(HPC_SSH_HOST),
             )
-            if log_code == 0 and stdout:
-                return {"job_id": job_id, "log": stdout}
+            if t_code == 0:
+                stdout_log = t_out
+            elif "Permission denied" in (t_err or t_out):
+                stdout_log = f"[Permission Denied] Log file belongs to cluster user '{job_user}'."
 
+        if stderr_path and stderr_path != "/dev/null":
+            if not stderr_path.startswith("/") and work_dir:
+                stderr_path = f"{work_dir.rstrip('/')}/{stderr_path}"
+            if stderr_path == stdout_path:
+                stderr_log = ""
+            else:
+                t_code, t_out, t_err = await run_slurm_cli_async(
+                    ["tail", "-n", "200", stderr_path],
+                    use_cache=False,
+                    remote_only=bool(HPC_SSH_HOST),
+                )
+                if t_code == 0:
+                    stderr_log = t_out
+                elif "Permission denied" in (t_err or t_out):
+                    stderr_log = f"[Permission Denied] Log file belongs to cluster user '{job_user}'."
+
+    if stdout_log or stderr_log:
+        return {
+            "job_id": job_id,
+            "stdout": stdout_log,
+            "stderr": stderr_log,
+            "log": combine_output(stdout_log, stderr_log),
+        }
+
+    # 2. Search known remote log directories if SSH configured
     if HPC_SSH_HOST:
-        code, stdout, _ = await run_slurm_cli_async([
-            "tail", "-n", "100", f"{HPC_LOG_DIR}/vllm-{job_id}.out"
-        ], use_cache=False, remote_only=True)
-        if code == 0 and stdout:
-            return {"job_id": job_id, "log": stdout}
+        remote_dirs = [
+            HPC_LOG_DIR,
+            f"{HPC_REMOTE_DIR}/logs",
+            f"{HPC_REMOTE_DIR}/llama-cpp/logs",
+        ]
+        unique_dirs = list(dict.fromkeys(d for d in remote_dirs if d))
+        find_cmd = [
+            "bash", "-c",
+            f"find {' '.join(unique_dirs)} -name '*{job_id}*' 2>/dev/null"
+        ]
+        f_code, f_stdout, _ = await run_slurm_cli_async(find_cmd, use_cache=False, remote_only=True)
+        if f_code == 0 and f_stdout.strip():
+            found_paths = [p.strip() for p in f_stdout.strip().split("\n") if p.strip()]
+            for p in found_paths:
+                code_tail, content_tail, _ = await run_slurm_cli_async(["tail", "-n", "200", p], use_cache=False, remote_only=True)
+                if code_tail == 0 and content_tail:
+                    if p.endswith(".err"):
+                        stderr_log = (stderr_log + "\n" + content_tail).strip() if stderr_log else content_tail
+                    else:
+                        stdout_log = (stdout_log + "\n" + content_tail).strip() if stdout_log else content_tail
 
-    log_candidates = [
-        ROOT_DIR / "infra" / "logs" / f"vllm-{job_id}.out",
-        ROOT_DIR / "infra" / "logs" / f"qwen-server-{job_id}.out",
-        ROOT_DIR / "infra" / "logs" / f"slurm-{job_id}.out",
-        ROOT_DIR / "logs" / f"vllm-{job_id}.out",
-        ROOT_DIR / "logs" / f"qwen-server-{job_id}.out",
-        ROOT_DIR / "logs" / f"slurm-{job_id}.out",
+        if stdout_log or stderr_log:
+            return {
+                "job_id": job_id,
+                "stdout": stdout_log,
+                "stderr": stderr_log,
+                "log": combine_output(stdout_log, stderr_log),
+            }
+
+    # 3. Check local directories
+    local_dirs = [
+        ROOT_DIR / "infra" / "logs",
+        ROOT_DIR / "logs",
+        ROOT_DIR / "infra" / "llama-cpp" / "logs",
     ]
-    for path in log_candidates:
-        if path.is_file():
-            try:
-                content = path.read_text(encoding="utf-8", errors="replace")
-                return {"job_id": job_id, "log": content[-8000:]}
-            except Exception:
-                pass
+    for l_dir in local_dirs:
+        if l_dir.is_dir():
+            for p in l_dir.glob(f"*{job_id}*"):
+                if p.is_file():
+                    try:
+                        content = p.read_text(encoding="utf-8", errors="replace")[-12000:]
+                        if p.name.endswith(".err"):
+                            stderr_log = (stderr_log + "\n" + content).strip() if stderr_log else content
+                        else:
+                            stdout_log = (stdout_log + "\n" + content).strip() if stdout_log else content
+                    except Exception:
+                        pass
+
+    if stdout_log or stderr_log:
+        return {
+            "job_id": job_id,
+            "stdout": stdout_log,
+            "stderr": stderr_log,
+            "log": combine_output(stdout_log, stderr_log),
+        }
+
+    # 4. Job is pending or no logs produced yet
+    if job_state in ("PENDING", "PD"):
+        reason_msg = f" (Reason: {job_reason})" if job_reason and job_reason != "None" else ""
+        return {
+            "job_id": job_id,
+            "stdout": "",
+            "stderr": "",
+            "log": f"[Slurm Job #{job_id}] Status is PENDING{reason_msg}. Output logs will start streaming as soon as a GPU compute node is allocated and initialized.",
+        }
 
     return {
         "job_id": job_id,
-        "log": f"No active log file found for Slurm Job ID {job_id} in {HPC_REMOTE_DIR}/logs/.",
+        "stdout": "",
+        "stderr": "",
+        "log": f"[Slurm Job #{job_id}] No active log file found. The job may still be initializing or has already completed.",
     }
 
 
@@ -416,15 +495,15 @@ async def stream_slurm_job_log(job_id: str, request: Request):
                     break
 
                 log_data = await get_slurm_job_log(job_id)
-                current_text = log_data.get("stdout") or log_data.get("log") or ""
+                current_text = log_data.get("log") or ""
+                stdout_text = log_data.get("stdout") or ""
                 stderr_text = log_data.get("stderr") or ""
-                if stderr_text and not current_text:
-                    current_text = f"[stderr]\n{stderr_text}"
 
                 if current_text != last_content or iteration == 0:
                     payload = {
                         "job_id": job_id,
                         "log": current_text,
+                        "stdout": stdout_text,
                         "stderr": stderr_text,
                         "timestamp": time.time(),
                         "status": "STREAMING",

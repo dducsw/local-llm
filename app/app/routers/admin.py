@@ -201,45 +201,13 @@ def get_telemetry(current_user: str = Depends(require_viewer_or_admin)):
 
 @router.get("/slurm/status")
 async def get_slurm_status(current_user: str = Depends(require_admin)):
-    code, stdout, _ = await run_slurm_cli_async(["sinfo", "-N", "-o", "%N|%T|%C|%m|%G|%P", "--noheader"])
-    nodes = []
-    if code == 0 and stdout:
-        for line in stdout.strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            parts = line.split("|")
-            if len(parts) >= 5:
-                nodes.append({
-                    "node": parts[0].strip(),
-                    "state": parts[1].strip(),
-                    "cpus": parts[2].strip(),
-                    "memory": parts[3].strip(),
-                    "gres": parts[4].strip(),
-                    "partition": parts[5].strip() if len(parts) > 5 else "gpu-queue",
-                })
-
-    sq_code, sq_out, _ = await run_slurm_cli_async(["squeue", "--format=%i|%j|%P|%T|%M|%R|%b", "--noheader"])
-    jobs = []
-    if sq_code == 0 and sq_out:
-        for line in sq_out.strip().split("\n"):
-            if not line.strip():
-                continue
-            parts = line.split("|")
-            if len(parts) >= 6:
-                jobs.append({
-                    "job_id": parts[0].strip(),
-                    "name": parts[1].strip(),
-                    "partition": parts[2].strip(),
-                    "status": parts[3].strip(),
-                    "time": parts[4].strip(),
-                    "node": parts[5].strip(),
-                    "gres": parts[6].strip() if len(parts) > 6 else "gpu:1",
-                })
-
+    """Legacy admin status endpoint - delegates to modular Slurm router functions (DRY)."""
+    from app.routers.slurm import get_slurm_jobs, get_slurm_nodes
+    nodes_res = await get_slurm_nodes()
+    jobs_res = await get_slurm_jobs()
     return {
         "status": "live",
-        "nodes": nodes,
-        "jobs": jobs,
+        "nodes": nodes_res.get("nodes", []),
+        "jobs": jobs_res.get("jobs", []),
         "tunnel": TUNNEL_MANAGER.get_info(),
     }

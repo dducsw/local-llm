@@ -33,12 +33,13 @@ async def lifespan(_: FastAPI):
     monitor_task = asyncio.create_task(auto_tunnel_monitor_loop())
 
     async def _ensure_cluster_environment():
-        from app.config import HPC_SSH_HOST, HPC_REMOTE_DIR
+        from app.config import HPC_SSH_HOST, HPC_REMOTE_DIR, HPC_LOG_DIR
         from app.services.slurm_service import run_slurm_cli_async
         if HPC_SSH_HOST and HPC_SSH_HOST != "your-host":
             try:
-                work_dir = HPC_REMOTE_DIR or "/home/ducledinh/dev/local-llm/infra"
-                cmd = ["bash", "-c", f"mkdir -p '{work_dir}/logs' /home/ducledinh/dev/local-llm/logs '{work_dir}/llama-cpp/logs'"]
+                work_dir = HPC_REMOTE_DIR
+                log_dir = HPC_LOG_DIR
+                cmd = ["bash", "-c", f"mkdir -p '{log_dir}' '{work_dir}/logs' '{work_dir}/llama-cpp/logs'"]
                 await run_slurm_cli_async(cmd, timeout=5.0, use_cache=False)
                 log.info("HPC cluster logs directories verified & ensured.")
             except Exception as e:
@@ -65,10 +66,18 @@ app = FastAPI(
 )
 
 # Cross-Origin Resource Sharing (CORS)
+cors_origins_raw = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
+if cors_origins_raw and cors_origins_raw != "*":
+    allow_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
+    allow_credentials = True
+else:
+    allow_origins = ["*"]
+    allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allow_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -77,19 +86,29 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     log.error("Unhandled server exception on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": {
-                "message": "Internal server error",
-                "type": "internal_error",
-                "detail": str(exc),
-            }
-        },
-    )
+    content = {
+        "error": {
+            "message": "Internal server error",
+            "type": "internal_error",
+        }
+    }
+    # Only reveal internal exception details in explicit development/debug mode
+    if os.getenv("DEBUG", "").lower() in ("true", "1") or os.getenv("ENVIRONMENT") == "development":
+        content["error"]["detail"] = str(exc)
+
+    return JSONResponse(status_code=500, content=content)
 
 
 # Mount all modular application routers

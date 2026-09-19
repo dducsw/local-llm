@@ -130,7 +130,7 @@ function renderRealtimeMetrics(data) {
     const modelProvider = document.getElementById('metric-model-provider');
     const modelKvCache = document.getElementById('metric-model-kv-cache');
 
-    if (modelName) modelName.innerText = data.model || 'qwen3.5-9b';
+    if (modelName) modelName.innerText = data.model || ((typeof availableModels !== 'undefined' && availableModels[0]?.id) ? availableModels[0].id : 'Active Serving Model');
     if (modelUpstream) {
         const upstream = data.upstream_target || '127.0.0.1:18000';
         const backend = data.backend_type || 'vLLM Engine';

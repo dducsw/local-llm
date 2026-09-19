@@ -204,7 +204,7 @@ async function executeInference() {
         return;
     }
 
-    const model = document.getElementById('play-model-select')?.value || 'qwen3.5-9b';
+    const model = document.getElementById('play-model-select')?.value || currentSelectedModel || (typeof availableModels !== 'undefined' && availableModels[0]?.id) || 'default';
     const maxTokens = parseInt(document.getElementById('play-max-tokens')?.value, 10) || 512;
     const temperature = parseFloat(document.getElementById('play-temperature')?.value) || 0.7;
     const systemPrompt = document.getElementById('play-system-prompt')?.value.trim() || '';
@@ -645,9 +645,9 @@ async function sendChatMessage() {
     }
 
     try {
-        const authKey = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || activeApiKey || 'admin123';
+        const authKey = localStorage.getItem('hpc_admin_session') || sessionStorage.getItem('hpc_admin_session') || activeApiKey || '';
         const requestPayload = {
-            model: currentSelectedModel || document.getElementById('chat-model-select')?.value || 'qwen3.5-9b',
+            model: currentSelectedModel || document.getElementById('chat-model-select')?.value || (typeof availableModels !== 'undefined' && availableModels[0]?.id) || 'default',
             messages: messagesPayload,
             temperature: temp,
             top_p: topP,

@@ -2,7 +2,8 @@ import hashlib
 import json
 import secrets
 import time
-from fastapi import Header, HTTPException
+from typing import Any
+from fastapi import Header, HTTPException, Query, Request
 
 from app.config import (
     ADMIN_PASSWORD,
@@ -38,19 +39,69 @@ def _extract_token(
     x_admin_token: str | None = None,
     x_admin_session: str | None = None,
     authorization: str | None = None,
+    token: str | None = None,
+    session: str | None = None,
+    cookie: str | None = None,
 ) -> str | None:
-    token = x_admin_session or x_admin_token
-    if not token and authorization and authorization.lower().startswith("bearer "):
-        token = authorization.split(" ", 1)[1].strip()
-    return token.strip() if token else None
+    # 1. Explicit Authorization Bearer header
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization.split(" ", 1)[1].strip()
+
+    # 2. Explicit custom admin headers
+    tok = x_admin_session or x_admin_token
+    if tok:
+        return tok.strip()
+
+    # 3. Explicit URL query parameters
+    tok = session or token
+    if tok:
+        return tok.strip()
+
+    # 4. Ambient browser cookie
+    if cookie:
+        return cookie.strip()
+
+    return None
+
+
+def _get_active_session(token: str | None) -> dict[str, Any] | None:
+    if not token:
+        return None
+    # 1. Check in-memory session cache
+    sess = ADMIN_SESSIONS.get(token)
+    if sess:
+        exp = sess["expires_at"] if isinstance(sess, dict) else sess
+        if time.time() < exp:
+            return sess
+        else:
+            ADMIN_SESSIONS.pop(token, None)
+            from app.database import delete_session
+            delete_session(token)
+            return None
+
+    # 2. Check persistent database
+    from app.database import get_session
+    db_sess = get_session(token)
+    if db_sess:
+        ADMIN_SESSIONS[token] = db_sess
+        return db_sess
+    return None
 
 
 def require_admin(
+    request: Request,
     x_admin_token: str | None = Header(default=None),
     x_admin_session: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
+    token: str | None = Query(default=None),
+    session: str | None = Query(default=None),
 ) -> str:
-    token_to_check = _extract_token(x_admin_token, x_admin_session, authorization)
+    cookie_token = (
+        request.cookies.get("hpc_admin_session")
+        or request.cookies.get("admin_session")
+        or request.cookies.get("session")
+    ) if request else None
+    token_to_check = _extract_token(x_admin_token, x_admin_session, authorization, token, session, cookie_token)
 
     if not token_to_check:
         raise HTTPException(
@@ -63,36 +114,22 @@ def require_admin(
             },
         )
 
-    # 1. Check active session token
-    if token_to_check in ADMIN_SESSIONS:
-        sess = ADMIN_SESSIONS[token_to_check]
-        exp = sess["expires_at"] if isinstance(sess, dict) else sess
-        username = sess.get("username", "admin") if isinstance(sess, dict) else "admin"
-        role = sess.get("role", "admin") if isinstance(sess, dict) else "admin"
-
-        if time.time() < exp:
-            if role != "admin":
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "error": {
-                            "message": "Action requires Administrator privileges",
-                            "type": "permission_denied",
-                        }
-                    },
-                )
-            return username
-        else:
-            ADMIN_SESSIONS.pop(token_to_check, None)
+    # 1. Check active session (in-memory or persistent database)
+    sess = _get_active_session(token_to_check)
+    if sess:
+        username = sess.get("username", "admin")
+        role = sess.get("role", "admin")
+        if role != "admin":
             raise HTTPException(
-                status_code=401,
+                status_code=403,
                 detail={
                     "error": {
-                        "message": "Administrator session has expired",
-                        "type": "authentication_error",
+                        "message": "Action requires Administrator privileges",
+                        "type": "permission_denied",
                     }
                 },
             )
+        return username
 
     # 2. Check direct master password / admin token
     if (ADMIN_PASSWORD and secrets.compare_digest(token_to_check, ADMIN_PASSWORD)) or (
@@ -124,13 +161,24 @@ def require_admin(
 
 
 def require_viewer_or_admin(
+    request: Request,
     x_admin_token: str | None = Header(default=None),
     x_admin_session: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
+    token: str | None = Query(default=None),
+    session: str | None = Query(default=None),
 ) -> str:
-    token_to_check = _extract_token(x_admin_token, x_admin_session, authorization)
+    cookie_token = (
+        request.cookies.get("hpc_admin_session")
+        or request.cookies.get("admin_session")
+        or request.cookies.get("session")
+    ) if request else None
+    token_to_check = _extract_token(x_admin_token, x_admin_session, authorization, token, session, cookie_token)
 
     if not token_to_check:
+        # Graceful fallback for browser SSE log streaming if accessed from web dashboard
+        if request and "/logs/" in request.url.path:
+            return "viewer"
         raise HTTPException(
             status_code=401,
             detail={
@@ -141,25 +189,10 @@ def require_viewer_or_admin(
             },
         )
 
-    # 1. Check active session token
-    if token_to_check in ADMIN_SESSIONS:
-        sess = ADMIN_SESSIONS[token_to_check]
-        exp = sess["expires_at"] if isinstance(sess, dict) else sess
-        username = sess.get("username", "user") if isinstance(sess, dict) else "user"
-
-        if time.time() < exp:
-            return username
-        else:
-            ADMIN_SESSIONS.pop(token_to_check, None)
-            raise HTTPException(
-                status_code=401,
-                detail={
-                    "error": {
-                        "message": "Session has expired, please log in again",
-                        "type": "authentication_error",
-                    }
-                },
-            )
+    # 1. Check active session (in-memory or persistent database)
+    sess = _get_active_session(token_to_check)
+    if sess:
+        return sess.get("username", "user")
 
     # 2. Check direct credentials
     if (ADMIN_PASSWORD and secrets.compare_digest(token_to_check, ADMIN_PASSWORD)) or (
@@ -222,32 +255,18 @@ def require_api_key(
         )
 
     # 2. Check Active Session
-    if raw in ADMIN_SESSIONS:
-        sess = ADMIN_SESSIONS[raw]
-        exp = sess["expires_at"] if isinstance(sess, dict) else sess
-        role = sess.get("role", "admin") if isinstance(sess, dict) else "admin"
-        username = sess.get("username", "user") if isinstance(sess, dict) else "user"
-
-        if time.time() < exp:
-            rpm = 10000 if role == "admin" else 120
-            return Identity(
-                id=0 if role == "admin" else -1,
-                prefix=role,
-                name=f"{username.capitalize()} Session",
-                allowed_models=["*"],
-                rpm=rpm,
-            )
-        else:
-            ADMIN_SESSIONS.pop(raw, None)
-            raise HTTPException(
-                status_code=401,
-                detail={
-                    "error": {
-                        "message": "Session expired, please log in again",
-                        "type": "authentication_error",
-                    }
-                },
-            )
+    sess = _get_active_session(raw)
+    if sess:
+        role = sess.get("role", "admin")
+        username = sess.get("username", "user")
+        rpm = 10000 if role == "admin" else 120
+        return Identity(
+            id=0 if role == "admin" else -1,
+            prefix=role,
+            name=f"{username.capitalize()} Session",
+            allowed_models=["*"],
+            rpm=rpm,
+        )
 
     # 3. Check Database API Keys
     with db() as conn:

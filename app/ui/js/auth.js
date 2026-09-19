@@ -25,6 +25,16 @@ async function checkAdminAuth() {
             if (res.ok) {
                 const data = await res.json();
                 if (data.authenticated) {
+                    if (data.username) {
+                        if (localStorage.getItem('hpc_admin_session')) {
+                            localStorage.setItem('hpc_admin_username', data.username);
+                        } else {
+                            sessionStorage.setItem('hpc_admin_username', data.username);
+                        }
+                    }
+                    try {
+                        document.cookie = `hpc_admin_session=${encodeURIComponent(session)}; path=/; max-age=604800; SameSite=Lax`;
+                    } catch (e) {}
                     showMainDashboard(data.username || 'admin', data.role || 'viewer');
                     return true;
                 }
@@ -108,6 +118,9 @@ async function performScreenLogin() {
                 sessionStorage.setItem('hpc_user_role', role);
             }
             adminToken = data.token;
+            try {
+                document.cookie = `hpc_admin_session=${encodeURIComponent(data.token)}; path=/; max-age=604800; SameSite=Lax`;
+            } catch (e) {}
             showToast(`Signed in as ${data.username} (${role.toUpperCase()})`, 'success');
             showMainDashboard(data.username, role);
         } else {
@@ -145,6 +158,9 @@ async function performLogout() {
     sessionStorage.removeItem('hpc_admin_username');
     sessionStorage.removeItem('hpc_user_role');
     adminToken = '';
+    try {
+        document.cookie = 'hpc_admin_session=; path=/; max-age=0; SameSite=Lax';
+    } catch (e) {}
 
     showToast('Signed out of session', 'info');
     showLoginScreen();

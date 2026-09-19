@@ -1,36 +1,16 @@
-import secrets
 import httpx
 from fastapi import APIRouter, Depends, Header, Request
 
-from app.config import (
-    ADMIN_PASSWORD,
-    ADMIN_SESSIONS,
-    ADMIN_TOKEN,
-    MODELS,
-    load_models,
-)
+from app.config import load_models
 from app.schemas import Identity
-from app.services.auth_service import allowed, require_api_key
+from app.services.auth_service import require_api_key
 from app.services.proxy_service import proxy_openai
 
 router = APIRouter(prefix="/v1", tags=["OpenAI Compatible"])
 
 
 @router.get("/models")
-async def models(
-    authorization: str | None = Header(default=None),
-    x_admin_session: str | None = Header(default=None),
-    x_admin_token: str | None = Header(default=None),
-):
-    token = x_admin_session or x_admin_token
-    is_admin = False
-    if token and (token in ADMIN_SESSIONS or (ADMIN_PASSWORD and secrets.compare_digest(token, ADMIN_PASSWORD)) or (ADMIN_TOKEN and secrets.compare_digest(token, ADMIN_TOKEN))):
-        is_admin = True
-    elif authorization and authorization.lower().startswith("bearer "):
-        raw = authorization.split(" ", 1)[1].strip()
-        if (ADMIN_PASSWORD and secrets.compare_digest(raw, ADMIN_PASSWORD)) or (ADMIN_TOKEN and secrets.compare_digest(raw, ADMIN_TOKEN)) or raw in ADMIN_SESSIONS:
-            is_admin = True
-
+async def models():
     current_models = load_models()
 
     # Check live reachability of each upstream model backend

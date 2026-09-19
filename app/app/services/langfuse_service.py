@@ -6,6 +6,8 @@ LANGFUSE_ENABLE = os.getenv("LANGFUSE_ENABLE", "false").lower() in ("true", "1",
 LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "http://127.0.0.1:3000")
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
 LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
+# Default to false to protect user prompt and completion privacy; set to true explicitly if needed
+LANGFUSE_TRACE_PAYLOAD = os.getenv("LANGFUSE_TRACE_PAYLOAD", "false").lower() in ("true", "1", "yes")
 
 _langfuse_client = None
 
@@ -48,6 +50,10 @@ def log_generation_trace(
         return
 
     try:
+        # Privacy guard: mask prompts and completions unless explicitly enabled
+        trace_input = input_data if LANGFUSE_TRACE_PAYLOAD else "[PAYLOAD_MASKED]"
+        trace_output = output_text if LANGFUSE_TRACE_PAYLOAD else "[PAYLOAD_MASKED]"
+
         trace = client.trace(
             id=request_id,
             name="chat-completion",
@@ -58,8 +64,8 @@ def log_generation_trace(
             id=f"gen_{request_id}",
             name=model,
             model=model,
-            input=input_data,
-            output=output_text,
+            input=trace_input,
+            output=trace_output,
             usage={
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,

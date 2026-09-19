@@ -5,7 +5,7 @@
       "owned_by": "hpc-selfhosted",
       "base_url": "http://127.0.0.1:18000/v1",
       "upstream_model": "qwen3.5-9b",
-      "api_key": "dacn-qwen-3.5-9b-secret-key"
+      "api_key": "${UPSTREAM_API_KEY:-dacn-qwen-3.5-9b-secret-key}"
     }
   ]
 }

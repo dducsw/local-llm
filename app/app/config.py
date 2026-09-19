@@ -23,7 +23,7 @@ APP_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = APP_DIR.parent
 
 # Auto-load .env with python-dotenv
-for env_candidate in [APP_DIR / ".env", ROOT_DIR / ".env", Path(".env")]:
+for env_candidate in [APP_DIR / ".env", ROOT_DIR / ".env", Path(".env"), Path("/workspace/.env"), Path("/workspace/app/.env")]:
     if env_candidate.is_file():
         load_dotenv(dotenv_path=env_candidate, override=False)
         break
@@ -58,10 +58,19 @@ if not ADMIN_PASSWORD:
         ADMIN_PASSWORD = secrets.token_urlsafe(16)
         print(f"\n{'='*50}\nSECURITY WARNING: No ADMIN_PASSWORD set in .env!\nGenerated random admin password: {ADMIN_PASSWORD}\n{'='*50}\n")
 
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+WEAK_CREDENTIALS = {"admin123", "admin", "password", "123456", "change_this_to_a_secure_admin_password"}
+if ADMIN_PASSWORD in WEAK_CREDENTIALS:
+    if ENVIRONMENT == "production":
+        raise RuntimeError("CRITICAL SECURITY ERROR: Weak/default ADMIN_PASSWORD detected in production mode! Set a strong password in .env before deploying.")
+    else:
+        print(f"\n{'='*70}\n[SECURITY WARNING] Insecure default ADMIN_PASSWORD ('{ADMIN_PASSWORD}') in use!\nPlease set a strong random secret before exposing to public networks.\n{'='*70}\n")
+
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 
 VIEWER_USERNAME = os.getenv("VIEWER_USERNAME", "viewer")
 VIEWER_PASSWORD = os.getenv("VIEWER_PASSWORD", "viewer123")
+
 
 UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT", "3600"))
 MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "16"))
@@ -80,9 +89,21 @@ if not HPC_SSH_KEY or not os.path.exists(os.path.expanduser(HPC_SSH_KEY)):
         HPC_SSH_KEY = "/root/.ssh/id_ed25519"
     elif os.path.exists(os.path.expanduser("~/.ssh/id_ed25519")):
         HPC_SSH_KEY = os.path.expanduser("~/.ssh/id_ed25519")
-HPC_REMOTE_DIR = os.getenv("HPC_REMOTE_DIR", "~/local-llm/infra")
+
+# Dynamic user home path resolution on remote cluster (prevents hardcoded usernames)
+_remote_user_home = f"/home/{HPC_SSH_USER}" if HPC_SSH_USER else "~"
+HPC_REMOTE_DIR = os.getenv("HPC_REMOTE_DIR", f"{_remote_user_home}/dev/local-llm/infra")
 HPC_LOG_DIR = os.getenv("HPC_LOG_DIR", f"{HPC_REMOTE_DIR}/logs")
 HPC_SLURM_ACCOUNT = os.getenv("HPC_SLURM_ACCOUNT", "summer-school")
+
+# Slurm Cluster Defaults & Partitions
+DEFAULT_SLURM_PARTITION = os.getenv("DEFAULT_SLURM_PARTITION", "gpu-queue")
+SLURM_PARTITIONS_CONFIG = os.getenv("SLURM_PARTITIONS", "gpu-v100,gpu-queue")
+SLURM_AVAILABLE_PARTITIONS = [p.strip() for p in SLURM_PARTITIONS_CONFIG.split(",") if p.strip()]
+
+# Tunnel Ports
+TUNNEL_LOCAL_PORT = int(os.getenv("TUNNEL_LOCAL_PORT", "18000"))
+TUNNEL_REMOTE_PORT = int(os.getenv("TUNNEL_REMOTE_PORT", "18000"))
 
 logging.basicConfig(
     level=LOG_LEVEL,
@@ -117,6 +138,23 @@ class ModelRegistry:
             data = json.loads(self._path.read_text(encoding="utf-8"))
             models = {}
             for item in data.get("models", []):
+                # Resolve upstream api_key from environment if configured
+                raw_key = item.get("api_key", "")
+                api_key_env = item.get("api_key_env")
+                if api_key_env and os.getenv(api_key_env):
+                    item["api_key"] = os.getenv(api_key_env)
+                elif raw_key and raw_key.startswith("${") and raw_key.endswith("}"):
+                    inner = raw_key[2:-1]
+                    if ":-" in inner:
+                        env_k, default_v = inner.split(":-", 1)
+                        item["api_key"] = os.getenv(env_k) or default_v
+                    else:
+                        item["api_key"] = os.getenv(inner, "")
+                elif not item.get("api_key") and os.getenv("UPSTREAM_API_KEY"):
+                    item["api_key"] = os.getenv("UPSTREAM_API_KEY")
+                elif not item.get("api_key") and "127.0.0.1:18000" in item.get("base_url", ""):
+                    # Safe fallback for local HPC reverse tunnel
+                    item["api_key"] = os.getenv("UPSTREAM_API_KEY", "dacn-qwen-3.5-9b-secret-key")
                 models[item["id"]] = item
             self._cache = models
             self._last_loaded = now

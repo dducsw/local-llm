@@ -129,7 +129,7 @@ function openViewKeyModalById(keyId) {
     }
 
     const hostBase = window.location.origin;
-    const modelToUse = keyObj.allowed_models.includes('*') ? 'qwen3.5-9b' : keyObj.allowed_models[0];
+    const modelToUse = keyObj.allowed_models.includes('*') ? ((typeof availableModels !== 'undefined' && availableModels[0]?.id) || 'default') : keyObj.allowed_models[0];
 
     if (curlPre) {
         curlPre.innerText = `curl -N -X POST ${hostBase}/v1/chat/completions \\

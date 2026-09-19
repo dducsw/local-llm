@@ -4,7 +4,7 @@ set -euo pipefail
 # ==========================================
 # MODEL STORAGE PATH CONFIGURATION
 # ==========================================
-DEST_DIR="${1:-/home/ducledinh/dev/models}"
+DEST_DIR="${1:-${MODELS_DIR:-$HOME/dev/models}}"
 mkdir -p "$DEST_DIR"
 
 MODEL_NAME="Qwen3.5-9B-Q4_K_M.gguf"
